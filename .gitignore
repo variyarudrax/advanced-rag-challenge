@@ -1,0 +1,22 @@
+# secrets
+.env
+
+# python
+__pycache__/
+*.pyc
+backend/venv/
+backend/.venv/
+
+# node
+frontend/node_modules/
+frontend/dist/
+
+# misc
+.DS_Store
+
+# generated
+chroma_db/
+results/
+
+# local tooling
+.claude/settings.local.json
