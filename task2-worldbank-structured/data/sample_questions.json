@@ -2,16 +2,26 @@
   {
     "question": "What is the growth outlook for South Asia in this report?",
     "expected_answer": "Growth in South Asia is expected to soften to 6.3 percent in 2026, mainly because of the Middle East conflict (higher energy prices, reduced oil and gas supplies, and disruptions to remittances and tourism). The forecast was marginally upgraded since January on stronger domestic demand and exports, and growth is set to pick up to an average of 7 percent per year in 2027-28. India is projected to grow 6.6 percent in FY2026/27.",
-    "expected_pages": [96, 97]
+    "expected_pages": [
+      96,
+      97
+    ],
+    "expected_section": "South Asia"
   },
   {
     "question": "What does Chapter 3 say about sovereign debt in developing economies?",
     "expected_answer": "Rising government debt in EMDEs leads to higher interest rates, higher debt-service payments, and a greater likelihood of debt distress. Debt is positively and non-linearly associated with sovereign bond spreads and domestic-currency yields; the rise in EMDE debt-to-GDP since 2010 is associated with increases of about 110 and 30 basis points, respectively. EMDE government debt has risen from under 40 percent of GDP in 2010 to over 70 percent. Effects are larger in countries with a history of default, low credit ratings, frontier market status, heavy short-term debt, and weak governance. The chapter calls for stronger fiscal positions through revenue mobilization, more efficient spending, better debt management, domestic debt market development, and debt-for-development swaps.",
-    "expected_pages": [109]
+    "expected_pages": [
+      109
+    ],
+    "expected_section": "Chapter 3"
   },
   {
     "question": "According to the executive summary, what are the main risks to the global outlook?",
     "expected_answer": "Risks are skewed to the downside: renewed escalation of hostilities or prolonged disruptions to commodity flows could raise commodity prices, intensify inflation and food insecurity, trigger financial stress, and lower growth. If energy disruptions are more severe and accompanied by substantial financial stress, global growth could fall to 1.3 percent in 2026. Persistent trade policy uncertainty, geopolitical strains, and weather-related shocks are also material risks. On the upside, broader AI investment and adoption could lift activity.",
-    "expected_pages": [19]
+    "expected_pages": [
+      19
+    ],
+    "expected_section": "Executive Summary"
   }
 ]

@@ -1,0 +1,7 @@
+[
+  {
+    "question": "Replace with a sample question from the team",
+    "expected_answer": "Optional: the correct answer, used by --judge",
+    "expected_pages": [1]
+  }
+]
