@@ -1,0 +1,17 @@
+[
+  {
+    "question": "How much less energy does iMac use compared to the ENERGY STAR requirement?",
+    "expected_answer": "iMac uses 58 percent less energy than the requirement for ENERGY STAR.",
+    "expected_pages": [7]
+  },
+  {
+    "question": "What is the total carbon footprint of the iMac, and how much of that comes from product use versus manufacturing?",
+    "expected_answer": "For iMac (two ports) 256GB the total product footprint is 346 kg CO2e: production 50 percent, product use 45 percent, transportation 5 percent, and end-of-life processing under 1 percent. The iMac (four ports) 512GB configuration is 391 kg CO2e.",
+    "expected_pages": [10, 2]
+  },
+  {
+    "question": "What material is the iMac stand made from, and what percentage of it is recycled?",
+    "expected_answer": "The stand is made from aluminum, and it is 100 percent recycled aluminum.",
+    "expected_pages": [4, 1, 2]
+  }
+]

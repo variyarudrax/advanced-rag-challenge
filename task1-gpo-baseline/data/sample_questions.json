@@ -1,0 +1,17 @@
+[
+  {
+    "question": "How many depository libraries did GPO staff visit in FY 2018?",
+    "expected_answer": "GPO staff visited 166 depository libraries in 25 states in FY 2018, bringing the 3-year total of visits to over 610.",
+    "expected_pages": [5, 21]
+  },
+  {
+    "question": "What new digital system replaced FDsys, and when was it fully deployed?",
+    "expected_answer": "govinfo replaced FDsys. The govinfo website came out of beta in December 2017, ran in parallel with FDsys through 2018, and FDsys was scheduled to be fully retired and replaced by govinfo in December 2018.",
+    "expected_pages": [22, 39]
+  },
+  {
+    "question": "How much did GPO procure in printing and information products in FY 2018 on behalf of federal agencies?",
+    "expected_answer": "More than $375 million (revenues from procured printing of $375.7 million), across more than 84,000 orders fulfilled by private-sector vendors.",
+    "expected_pages": [5, 14]
+  }
+]
