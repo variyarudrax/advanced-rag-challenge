@@ -6,7 +6,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(ROOT_DIR / ".env")
+# One .env at the repo root is shared by all tasks.
+load_dotenv(ROOT_DIR.parent / ".env")
 
 GOOGLE_API_KEY = os.environ["GOOGLE_API_KEY"]
 

@@ -1,58 +1,33 @@
-# GPO Annual Report – Baseline RAG
+# Advanced RAG Hands-on Challenge
 
-Ask questions about the GPO Annual Report and get answers grounded only in the
-report, with page citations. Built on the AskGPT stack.
+Three RAG tasks, each harder than the last: a baseline pipeline, then a long
+structured document, then a report whose answers sit in tables, charts and
+footnotes.
 
-- **Backend:** Python, FastAPI, LangChain, Gemini (`gemini-3.5-flash-lite` for chat, `gemini-embedding-001` for embeddings), Chroma (persisted to `chroma_db/`)
-- **Frontend:** Vite + React
+| Task | Folder | Document | Focus |
+|---|---|---|---|
+| 1 | [`task1-gpo-baseline/`](task1-gpo-baseline/) | GPO Annual Report | Ingestion, chunking, embeddings, retrieval, generation |
+| 2 | [`task2-worldbank-structured/`](task2-worldbank-structured/) | World Bank Economic Report (~200 pages) | Hierarchical/section-aware chunking, metadata, context management |
+| 3 | [`task3-apple-multimodal/`](task3-apple-multimodal/) | Apple iMac Environmental Report | Parsing tables, charts and footnotes so they can be retrieved |
 
-## Pipeline
-
-| Step | Where | Baseline choice |
-|---|---|---|
-| 1. Ingestion | `backend/app/ingest.py` | PyMuPDF, one document per page, light text cleanup, 1-indexed page metadata |
-| 2. Chunking | `backend/app/ingest.py` | Recursive splitter, 1000 chars / 150 overlap, chunks never cross pages |
-| 3. Embeddings | `backend/app/ingest.py` | `gemini-embedding-001`, cosine space, persisted Chroma index |
-| 4. Retrieval | `backend/app/rag.py` | Top-k similarity search, k = 6 |
-| 5. Generation | `backend/app/rag.py` | Grounded prompt, cites `(p. N)`, fixed "not found" reply |
-| Validation | `backend/app/evaluate.py` | Runs sample questions → CSV/JSON in `results/`; page hit@k + optional LLM judge |
-
-All tuning knobs are in `backend/app/config.py`.
+Each task is self-contained: its own backend, dependencies, vector store and
+README. Put each report PDF in that task's `data/` folder. Challenge-wide
+reference material lives in [`docs/`](docs/).
 
 ## Setup
 
-1. Put the report PDF in `data/` (any filename ending in `.pdf`).
-2. Put the sample questions in `data/sample_questions.json`, using the format in `data/sample_questions.example.json`. Only `question` is required. `expected_answer` enables `--judge`, and `expected_pages` enables the retrieval hit rate.
-3. `.env` in the project root:
-   ```
-   GOOGLE_API_KEY=your_api_key_here
-   ```
+One `.env` in the repo root is shared by all tasks:
 
-## Run
-
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-python -m app.ingest                      # build the index (once)
-python -m app.evaluate --judge            # validate on sample questions
-uvicorn app.main:app --reload --port 8000 # API for the UI
+```
+GOOGLE_API_KEY=your_api_key_here
 ```
 
-```bash
-cd frontend
-npm install
-npm run dev        # http://localhost:5173
-```
+Then follow the README inside the task folder.
 
-## API
+## Results
 
-- `GET /status`: whether the index is built, document name, chunk count
-- `GET /sample-questions`: questions from `data/sample_questions.json`
-- `POST /ask` `{"question": "..."}` → `{answer, found, sources: [{page, chunk_id, score, text}]}`
-
-## Notes
-
-- Re-run `python -m app.ingest` after changing chunk settings or the PDF.
-- Free-tier Gemini quotas are small. `evaluate.py --delay` spaces out requests.
+| Task | Sample questions | Retrieval hit@k | Judge score |
+|---|---|---|---|
+| 1 | | | |
+| 2 | | | |
+| 3 | | | |

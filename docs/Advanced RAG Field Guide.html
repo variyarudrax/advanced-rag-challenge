@@ -1,0 +1,661 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Advanced RAG Field Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column with a sticky chapter rail; each document is a chapter that runs
+   problem -> fix -> the number that moved. Highlighter yellow marks text that holds the answer. */
+:root {
+  --paper: #f6f7f9; --panel: #ffffff; --ink: #141c2e; --muted: #586179; --rule: #dde1e9; --soft: #eef1f6;
+  --accent: #2856c4; --accent-soft: #e4ebfb; --mark: #ffe36b; --mark-ink: #141c2e;
+  --good: #16845f; --good-soft: #ddf2ea; --bad: #c0392f; --bad-soft: #f8e1df;
+  --s-ingest: #6b7280; --s-chunk: #a15c07; --s-query: #7048c9; --s-retrieve: #2856c4; --s-post: #16845f; --s-gen: #d0571f;
+  --code-bg: #f1f3f8; --code-key: #7048c9; --code-str: #16845f; --code-com: #7d8598; --code-num: #a15c07;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  --step--1: .86rem; --step-0: 1.05rem; --step-1: 1.3rem; --step-2: 1.75rem; --step-3: 2.4rem; --step-4: clamp(2.4rem, 5.4vw, 3.9rem);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #0e1320; --panel: #151c2c; --ink: #e7ebf4; --muted: #9aa4ba; --rule: #2a3349; --soft: #1b2336;
+  --accent: #82a5ff; --accent-soft: #1f2c4d; --mark: #6b5a12; --mark-ink: #fff6cc;
+  --good: #4fc79b; --good-soft: #15342a; --bad: #f08379; --bad-soft: #3a1d1c;
+  --s-ingest: #9aa4ba; --s-chunk: #e0a24a; --s-query: #ad8cff; --s-retrieve: #82a5ff; --s-post: #4fc79b; --s-gen: #ff9a62;
+  --code-bg: #111827; --code-key: #ad8cff; --code-str: #4fc79b; --code-com: #7d879c; --code-num: #e0a24a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #0e1320; --panel: #151c2c; --ink: #e7ebf4; --muted: #9aa4ba; --rule: #2a3349; --soft: #1b2336;
+  --accent: #82a5ff; --accent-soft: #1f2c4d; --mark: #6b5a12; --mark-ink: #fff6cc;
+  --good: #4fc79b; --good-soft: #15342a; --bad: #f08379; --bad-soft: #3a1d1c;
+  --s-ingest: #9aa4ba; --s-chunk: #e0a24a; --s-query: #ad8cff; --s-retrieve: #82a5ff; --s-post: #4fc79b; --s-gen: #ff9a62;
+  --code-bg: #111827; --code-key: #ad8cff; --code-str: #4fc79b; --code-com: #7d879c; --code-num: #e0a24a; color-scheme: dark }
+
+* { box-sizing: border-box }
+html { scroll-behavior: smooth; scroll-padding-top: 72px }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } * { transition: none !important } }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: var(--step-0); line-height: 1.6; padding-inline: 16px }
+.wrap { max-width: 1160px; margin-inline: auto }
+h1, h2, h3 { font-family: var(--display); line-height: 1.1; text-wrap: balance; margin: 0 }
+h1 { font-size: var(--step-4); font-weight: 800; letter-spacing: -.02em }
+h2 { font-size: var(--step-3); font-weight: 700; letter-spacing: -.015em }
+h3 { font-size: var(--step-1); font-weight: 700 }
+p { margin: 0; max-width: 68ch }
+a { color: var(--accent) }
+.eyebrow { font-size: var(--step--1); font-weight: 600; text-transform: uppercase; letter-spacing: .09em; color: var(--muted) }
+.muted { color: var(--muted) }
+.mono { font-family: var(--mono); font-size: .88em }
+mark, .fact-text { background: var(--mark); color: var(--mark-ink); padding: 0 .15em; border-radius: 2px }
+button { font: inherit; color: inherit; cursor: pointer }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px }
+
+/* rail */
+nav.rail { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: blur(8px); border-bottom: 1px solid var(--rule); margin-inline: -16px; padding: 10px 16px }
+nav.rail .wrap { display: flex; gap: 6px; align-items: center; overflow-x: auto; scrollbar-width: none }
+nav.rail a { text-decoration: none; color: var(--muted); font-size: var(--step--1); font-weight: 500; padding: 5px 11px; border-radius: 99px; white-space: nowrap }
+nav.rail a.on { background: var(--ink); color: var(--paper) }
+nav.rail .hint { margin-left: auto; font-size: .78rem; color: var(--muted); white-space: nowrap; padding-left: 12px }
+@media (max-width: 1360px) { nav.rail .hint { display: none } }
+
+section { padding-block: 72px 24px; display: grid; gap: 28px }
+section + section { border-top: 1px solid var(--rule) }
+.head { display: grid; gap: 12px }
+.lead { font-size: var(--step-1); line-height: 1.45; color: var(--muted); max-width: 60ch }
+
+/* hero */
+.hero { padding-block: 56px 24px }
+.hero h1 span { color: var(--accent) }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px }
+.stat { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px; display: grid; gap: 4px }
+.stat .big { font-family: var(--display); font-size: var(--step-3); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1 }
+.stat .big small { font-size: .45em; font-weight: 600; color: var(--muted) }
+.stat .arrow { color: var(--muted); font-weight: 500; margin-inline: .2em }
+
+/* panels */
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 20px; display: grid; gap: 14px; min-width: 0 }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px }
+.two > * { min-width: 0 }
+.label { font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted) }
+.quote { font-size: .95rem; line-height: 1.55; background: var(--soft); border-radius: 8px; padding: 12px 14px; overflow-wrap: anywhere }
+.bad-l { border-left: 4px solid var(--bad) } .good-l { border-left: 4px solid var(--good) }
+.tag { display: inline-block; font-size: .74rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; white-space: nowrap }
+.tag.good { background: var(--good-soft); color: var(--good) } .tag.bad { background: var(--bad-soft); color: var(--bad) }
+.tag.new { background: var(--s-query); color: var(--panel) }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; background: var(--soft); padding: 4px; border-radius: 10px }
+.seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 7px; font-size: var(--step--1); font-weight: 500; color: var(--muted) }
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .12) }
+
+/* showcase */
+.showq { display: grid; gap: 8px }
+.showq select { font: inherit; font-size: var(--step-0); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); width: 100% }
+.answer { font-size: 1.08rem; line-height: 1.5 }
+.trace { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: .9rem }
+.trace li { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: baseline }
+.stage { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--panel); border-radius: 4px; padding: 2px 6px; text-align: center }
+
+/* pipeline flow */
+.flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; row-gap: 12px }
+.node { flex: 1 1 130px; min-width: 120px; background: var(--panel); border: 1.5px solid var(--rule); border-radius: 10px; padding: 10px 12px; display: grid; gap: 3px; align-content: start; transition: opacity .25s, border-color .25s }
+.node b { font-size: .95rem; line-height: 1.25 }
+.node .f { font-family: var(--mono); font-size: .72rem; color: var(--muted); overflow-wrap: anywhere }
+.node .d { font-size: .8rem; color: var(--muted); line-height: 1.35 }
+.node.off { opacity: .35; border-style: dashed }
+.node.hot { border-color: currentColor }
+.arr { flex: 0 0 22px; display: grid; place-items: center; color: var(--muted); font-size: 1rem }
+.lane { display: grid; gap: 10px }
+.lane-title { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap }
+
+/* map */
+.map { display: grid; grid-template-columns: repeat(6, minmax(150px, 1fr)); gap: 10px; overflow-x: auto; padding-bottom: 4px }
+.col { display: grid; gap: 8px; align-content: start; min-width: 150px }
+.col h3 { font-size: 1rem; display: flex; gap: 8px; align-items: center; padding-bottom: 6px; border-bottom: 3px solid currentColor }
+.col h3 .n { font-family: var(--mono); font-size: .75rem; opacity: .8 }
+.chip { text-align: left; border: 1px solid var(--rule); background: var(--panel); border-radius: 8px; padding: 8px 10px; font-size: .88rem; line-height: 1.3; display: grid; gap: 5px; text-decoration: none; color: var(--ink); transition: opacity .2s }
+.chip:hover { border-color: var(--accent) }
+.chip .docs { display: flex; gap: 4px; flex-wrap: wrap }
+.chip .docs i { font-style: normal; font-size: .66rem; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: var(--soft); color: var(--muted) }
+.chip.dim { opacity: .25 }
+
+/* chunk toy */
+.chunks { display: flex; flex-wrap: wrap; gap: 3px; font-size: .86rem; line-height: 1.5 }
+.ck { padding: 4px 6px; border-radius: 4px; border: 1px solid var(--rule) }
+.ck:nth-child(4n+1) { background: color-mix(in srgb, var(--s-retrieve) 14%, var(--panel)) }
+.ck:nth-child(4n+2) { background: color-mix(in srgb, var(--s-chunk) 16%, var(--panel)) }
+.ck:nth-child(4n+3) { background: color-mix(in srgb, var(--s-post) 14%, var(--panel)) }
+.ck:nth-child(4n) { background: color-mix(in srgb, var(--s-query) 14%, var(--panel)) }
+.ck .ov { text-decoration: underline wavy var(--s-gen); text-underline-offset: 3px }
+.cut { color: var(--bad); font-weight: 700 }
+input[type="range"] { width: 100%; accent-color: var(--accent) }
+
+/* lists (RRF) */
+.lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px }
+.rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; counter-reset: r }
+.rank li { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: baseline; font-size: .86rem; padding: 6px 8px; border-radius: 6px; background: var(--soft); counter-increment: r }
+.rank li::before { content: counter(r); font-family: var(--mono); font-weight: 600; color: var(--muted) }
+.rank li.fact { background: var(--mark); color: var(--mark-ink) }
+.rank li .sc { font-family: var(--mono); font-size: .78rem; font-variant-numeric: tabular-nums }
+.rank li .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.rank li.hover { outline: 2px solid var(--accent) }
+
+/* bars */
+.ladder { display: grid; gap: 8px }
+.lrow { display: grid; grid-template-columns: minmax(150px, 290px) 1fr 52px; gap: 12px; align-items: center; font-size: .92rem }
+.track { height: 22px; background: var(--soft); border-radius: 5px; position: relative; overflow: hidden }
+.fill { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 5px }
+.lrow.base .fill { background: var(--muted) } .lrow.worse .fill { background: var(--bad) } .lrow.note .fill { background: repeating-linear-gradient(135deg, var(--accent) 0 6px, var(--accent-soft) 6px 10px) }
+.lrow .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; text-align: right }
+.axis { display: grid; grid-template-columns: minmax(150px, 290px) 1fr 52px; gap: 12px; font-size: .74rem; color: var(--muted) }
+.axis .ticks { display: flex; justify-content: space-between; font-family: var(--mono) }
+
+/* breaks */
+.breaks { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px }
+.brk { align-content: start; gap: 10px }
+.brk h3 { font-size: var(--step-2) }
+.brk-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+.brk-facts div { display: grid; gap: 2px; font-size: .86rem; color: var(--muted) }
+.brk-facts b { font-family: var(--display); font-size: var(--step-3); color: var(--bad); line-height: 1; font-variant-numeric: tabular-nums }
+.excerpt { display: grid; gap: 6px; min-width: 0 }
+.excerpt pre.code { font-size: .88rem }
+
+/* code */
+.codebox { display: grid; gap: 10px; min-width: 0 }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px }
+.tabs button { border: 1px solid var(--rule); background: var(--panel); border-radius: 6px; padding: 4px 10px; font-family: var(--mono); font-size: .8rem }
+.tabs button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink) }
+pre.code { margin: 0; background: var(--code-bg); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: .82rem; line-height: 1.55; max-height: 460px }
+pre.code .k { color: var(--code-key); font-weight: 600 } pre.code .s { color: var(--code-str) } pre.code .c { color: var(--code-com); font-style: italic } pre.code .n { color: var(--code-num) }
+.where { font-family: var(--mono); font-size: .78rem; color: var(--muted) }
+
+/* tables */
+.tbl { overflow-x: auto }
+table { border-collapse: collapse; width: 100%; font-size: .9rem }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top }
+th { font-size: .74rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600 }
+td.none { color: var(--muted) }
+.callout { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; display: grid; gap: 6px }
+.callout.warn { border-color: var(--s-gen); background: color-mix(in srgb, var(--s-gen) 12%, var(--panel)) }
+
+/* chapter head */
+.chapter-head { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; align-items: end }
+.chapter-head .num { font-family: var(--display); font-size: clamp(3.5rem, 9vw, 6rem); font-weight: 800; line-height: .8; color: var(--accent) }
+.chapter-head .shape { grid-column: 1 / -1 }
+.problem-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px }
+.pf { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; font-size: .92rem }
+.pf .x { color: var(--bad); font-weight: 700 } .pf .o { color: var(--good); font-weight: 700 }
+
+/* parent/child */
+.nest { display: grid; gap: 10px }
+.parentbox { border: 2px solid var(--s-post); border-radius: 10px; padding: 10px; display: grid; gap: 8px }
+.kids { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px }
+.kid { border: 1.5px dashed var(--s-retrieve); border-radius: 6px; padding: 8px; font-size: .8rem; color: var(--muted) }
+.kid.hit { border-style: solid; background: var(--mark); color: var(--mark-ink) }
+.simbar { display: grid; grid-template-columns: 120px 1fr 56px; gap: 10px; align-items: center; font-size: .9rem }
+
+/* tree */
+.tree { font-family: var(--mono); font-size: .86rem; line-height: 1.75; background: var(--code-bg); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; overflow-x: auto; white-space: pre }
+.tree .c { color: var(--code-com) } .tree b { color: var(--accent) }
+.plan { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px }
+.plan li { display: grid; grid-template-columns: 52px 1fr; gap: 12px; padding: 9px 12px; background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; align-items: baseline }
+.plan .min { font-family: var(--mono); font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums }
+.next { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px }
+.next .panel { gap: 8px }
+footer { padding-block: 40px 60px; color: var(--muted); font-size: var(--step--1); border-top: 1px solid var(--rule) }
+
+@media (max-width: 640px) {
+  .lrow, .axis { grid-template-columns: 1fr 44px } .lrow .name, .axis span:first-child { grid-column: 1 / -1 }
+  .trace li { grid-template-columns: 1fr } .kids { grid-template-columns: 1fr 1fr } nav.rail .hint { display: none }
+  .arr { flex-basis: 100%; height: 16px; transform: rotate(90deg) }
+}
+</style>
+
+<nav class="rail" aria-label="Sections"><div class="wrap" id="rail">
+  <a href="#top">Start</a><a href="#map">The map</a><a href="#design">System design</a>
+  <a href="#gpo">1 · Plain text</a><a href="#gep">2 · Long report</a><a href="#imac">3 · Visual</a>
+  <a href="#compare">Before &amp; after</a><a href="#score">Scorecard</a><a href="#next">What's next</a>
+  <span class="hint">← → to move between sections</span>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ======================================================= HERO -->
+<section class="hero" id="top">
+  <div class="head">
+    <div class="eyebrow">Advanced RAG · session 2</div>
+    <h1>Three documents.<br><span>Three ways RAG breaks.</span></h1>
+    <p class="lead">Last session: retrieve the right passages, then let the model answer from them. We built exactly that, basic RAG, and pointed it at three real reports. Here is what it did.</p>
+  </div>
+  <div class="breaks">
+    <article class="panel brk">
+      <div class="eyebrow">Plain text · GPO annual report · 82 pages</div>
+      <h3>Scrambled text, weak ranking</h3>
+      <div class="label">What a standard PDF reader hands to RAG, page 4</div>
+      <div class="quote bad-l" id="brk-gpo"></div>
+      <div class="brk-facts"><div><b id="brk-gpo-hit"></b><span>of questions had the answer passage ranked first</span></div><div><b id="brk-gpo-cut"></b><span>of chunks end mid-sentence</span></div></div>
+      <p class="muted">The answers mostly survive on this easy document. The cracks show in what the model is handed.</p>
+    </article>
+    <article class="panel brk">
+      <div class="eyebrow">Long report · World Bank · 200 pages</div>
+      <h3>A confident wrong number</h3>
+      <div class="label">Question</div><p>What is the growth outlook for South Asia in this report?</p>
+      <div class="label">Basic RAG answered <span class="tag bad">Wrong</span></div>
+      <div class="quote bad-l">"The report projects that South Asia's real GDP growth will rise to about 4 percent in 2026 (up from 3.9 percent in 2025) …"</div>
+      <div class="label">The report says, page 96</div>
+      <div class="quote">"Growth in SAR is expected to soften to <mark>6.3 percent</mark> in 2026 …"</div>
+      <p class="muted">All five passages came from the right pages. None held the outlook sentence: they were fragments of tables.</p>
+    </article>
+    <article class="panel brk">
+      <div class="eyebrow">Visual · Apple iMac report · 12 pages</div>
+      <h3>The answer is in a chart</h3>
+      <div class="label">Question</div><p>What was the baseline emissions figure, and how many kilograms did the reductions remove?</p>
+      <div class="label">Basic RAG answered <span class="tag bad">Missed</span></div>
+      <div class="quote bad-l">"… a baseline emissions figure of 445 kg CO₂e … but it does not give the exact kilogram amount removed."</div>
+      <div class="label">The report says, chart on page 2</div>
+      <div class="quote">445 kg baseline, minus <mark>99 kg</mark> of reductions, gives 346 kg.</div>
+      <p class="muted">Text extraction keeps the chart's labels, not what they add up to. A footnote question on page 1 got "I could not find this in the document."</p>
+    </article>
+  </div>
+  <p class="lead">Each document breaks basic RAG in a different way. Today we fix each one with a small, specific technique, and measure what it changes. <a href="#compare">The same questions again, at the end.</a></p>
+</section>
+
+<!-- ======================================================= MAP -->
+<section id="map">
+  <div class="head">
+    <div class="eyebrow">The map</div>
+    <h2>Basic RAG has three steps. Advanced RAG improves each one.</h2>
+    <p class="lead">Two stages run once per document (offline), four run on every question. Each card is one technique we used. Click one to jump to it.</p>
+  </div>
+  <div><div class="seg" id="mapfilter" role="group" aria-label="Highlight a document">
+    <button aria-pressed="true" data-doc="all">All</button><button aria-pressed="false" data-doc="GPO">Plain text</button>
+    <button aria-pressed="false" data-doc="WB">Long report</button><button aria-pressed="false" data-doc="iMac">Visual</button></div></div>
+  <div class="map" id="mapgrid"></div>
+</section>
+
+<!-- ======================================================= DESIGN -->
+<section id="design">
+  <div class="head">
+    <div class="eyebrow">System design</div>
+    <h2>Two pipelines, one database</h2>
+    <p class="lead">Indexing turns each PDF into chunks with two vectors and metadata. Answering reads from the same Qdrant collection. Pick a pipeline to see which steps it uses and which file holds each one.</p>
+  </div>
+  <div><div class="seg" id="dfdpick" role="group" aria-label="Pipeline">
+    <button aria-pressed="false" data-p="naive">Naive</button><button aria-pressed="false" data-p="gpo">Plain text</button>
+    <button aria-pressed="true" data-p="gep">Long report</button><button aria-pressed="false" data-p="imac">Visual</button></div></div>
+  <div class="panel lane"><div class="lane-title"><h3>Offline: index a document</h3><span class="muted">once per PDF</span></div><div class="flow" id="flow-off"></div></div>
+  <div class="panel lane"><div class="lane-title"><h3>Online: answer a question</h3><span class="muted">every request</span></div><div class="flow" id="flow-on"></div></div>
+  <p class="muted" id="dfdnote"></p>
+</section>
+
+<!-- ======================================================= GPO -->
+<section id="gpo">
+  <div class="chapter-head"><div class="num">1</div><div><div class="eyebrow">Plain text · GPO 2018 Annual Report · 82 pages</div><h2>The baseline document</h2></div>
+    <p class="shape lead">Ordinary prose on two-column pages, with numbers inside sentences. If RAG cannot handle this, nothing else matters.</p></div>
+  <div class="problem-list">
+    <div class="pf"><span class="x">✕</span><span>Columns come out interleaved</span><span class="o">✓</span><span>Read left column, then right</span></div>
+    <div class="pf"><span class="x">✕</span><span>Chunks cut mid-sentence</span><span class="o">✓</span><span>Whole sentences, with overlap</span></div>
+    <div class="pf"><span class="x">✕</span><span>Right passage found, ranked low</span><span class="o">✓</span><span>Hybrid search, then rerank</span></div>
+    <div class="pf"><span class="x">✕</span><span>Model fills gaps from memory</span><span class="o">✓</span><span>Cite passages, or refuse</span></div>
+  </div>
+
+  <div class="panel" id="t-reading">
+    <h3>Reading order</h3>
+    <div class="two"><div><div class="label">The common default, page 4</div><div class="quote bad-l" id="read-common"></div></div>
+      <div><div class="label">Bands, then left column before right</div><div class="quote good-l" id="read-ours"></div></div></div>
+    <div class="excerpt" data-x="reading_order"></div>
+  </div>
+
+  <div class="panel" id="t-chunk">
+    <h3>Chunking: cut by size, or by sentence</h3>
+    <div class="two">
+      <div class="seg" id="chunkmode" role="group" aria-label="Chunking strategy"><button aria-pressed="true" data-m="naive">Every N characters</button><button aria-pressed="false" data-m="sent">Whole sentences + overlap</button></div>
+      <div><label class="label" for="chunksize">Chunk size: <span id="chunksizev"></span> characters</label><input type="range" id="chunksize" min="200" max="700" step="50" value="400"></div>
+    </div>
+    <div class="chunks" id="chunkview" aria-live="polite"></div>
+    <p class="muted" id="chunkstat"></p>
+    <div class="excerpt" data-x="sentence_chunks"></div>
+  </div>
+
+  <div class="panel" id="t-hybrid">
+    <h3>Hybrid search: meaning and keywords, merged by rank</h3>
+    <p class="muted" id="rrfq"></p>
+    <div class="lists">
+      <div><div class="label">Dense (meaning)</div><ol class="rank" id="l-dense"></ol></div>
+      <div><div class="label">BM25 (exact words)</div><ol class="rank" id="l-bm25"></ol></div>
+      <div><div class="label">Fused with RRF</div><ol class="rank" id="l-fused"></ol></div>
+    </div>
+    <div class="two">
+      <div class="callout"><b>Reciprocal Rank Fusion</b><span>Each chunk scores <span class="mono" id="rrfformula"></span> in every list it appears in. Add the scores, sort. Only ranks matter, so a cosine similarity and a BM25 score never need a common scale.</span></div>
+      <div class="seg" id="rrfk" role="group" aria-label="RRF constant"><button aria-pressed="true" data-k="2">k = 2 (Qdrant default)</button><button aria-pressed="false" data-k="60">k = 60 (original paper)</button></div>
+    </div>
+    <div class="excerpt" data-x="hybrid_search"></div>
+    <div class="label">Then a cross-encoder rereads the top 20, question and passage together</div>
+    <ol class="rank" id="l-rerank"></ol>
+    <div class="excerpt" data-x="rerank"></div>
+    <p class="muted">Highlighted: the passage that holds the answer. Hover a row to find the same chunk in the other lists.</p>
+  </div>
+
+  <div class="panel" id="t-ground">
+    <h3>Grounded answers</h3>
+    <div class="two"><pre class="code" id="sysprompt"></pre>
+      <div class="callout"><b>Why it matters</b><span>Ask about FY 2020 (the report covers FY 2018). Both pipelines reply <i>"I could not find this in the document."</i> A refusal is a correct answer. The numbered passages make every claim checkable.</span></div></div>
+  </div>
+
+  <div class="panel"><h3>What moved the number</h3><p class="muted">Mean reciprocal rank (MRR): 1.0 means the answer passage always came first; 0.5 means second on average. 10 questions.</p><div class="ladder" id="lad-gpo"></div>
+    <p class="muted">Sentence chunks gave the biggest jump. Hybrid alone did not help on this document; the reranker did.</p></div>
+</section>
+
+<!-- ======================================================= GEP -->
+<section id="gep">
+  <div class="chapter-head"><div class="num">2</div><div><div class="eyebrow">Long, structured · World Bank Global Economic Prospects, June 2026 · 200 pages</div><h2>The problem is where a passage lives</h2></div>
+    <p class="shape lead">Four chapters, boxed articles, and six regions that all talk about "growth forecasts". The words match everywhere; only the location tells them apart.</p></div>
+  <div class="problem-list">
+    <div class="pf"><span class="x">✕</span><span>"Te conﬂict", "sustainabil- ity"</span><span class="o">✓</span><span>Repair the extracted text</span></div>
+    <div class="pf"><span class="x">✕</span><span>No idea which chapter or region</span><span class="o">✓</span><span>Read headings from the fonts</span></div>
+    <div class="pf"><span class="x">✕</span><span>Passage says "SAR", not "South Asia"</span><span class="o">✓</span><span>Embed the heading path with it</span></div>
+    <div class="pf"><span class="x">✕</span><span>Question names a place</span><span class="o">✓</span><span>Turn it into a filter</span></div>
+    <div class="pf"><span class="x">✕</span><span>Small chunks lack context</span><span class="o">✓</span><span>Search small, answer from the parent</span></div>
+  </div>
+
+  <div class="panel" id="t-repair">
+    <h3>The text is damaged before we start</h3>
+    <div class="two"><div><div class="label">Raw extraction, executive summary</div><div class="quote bad-l" id="lig-raw"></div></div>
+      <div><div class="label">Repaired</div><div class="quote good-l" id="lig-fixed"></div></div></div>
+    <p class="muted">The font drops the "Th" ligature and keeps "ﬂ" as one character. To a search engine, "Te" and "The" are different words.</p>
+  </div>
+
+  <div class="panel" id="t-fonts">
+    <h3>Structure from fonts</h3>
+    <div class="two"><div class="excerpt" data-x="line_kind"></div>
+      <div class="stats" id="hier-stats" style="grid-template-columns: 1fr 1fr"></div></div>
+    <p class="muted">We looked at the PDF once: body text is 11pt Garamond, headings are Helvetica. Four rules recover the outline. Every chunk then carries its chapter, region and heading path as metadata.</p>
+  </div>
+
+  <div class="panel" id="t-heading">
+    <h3>The passage never says "South Asia"</h3>
+    <div class="quote" id="sar-text"></div>
+    <div class="simbar"><span>Text alone</span><div class="track"><div class="fill" id="sim1"></div></div><span class="mono" id="sim1v"></span></div>
+    <div class="simbar"><span>Heading + text</span><div class="track"><div class="fill" id="sim2"></div></div><span class="mono" id="sim2v"></span></div>
+    <p class="muted">Similarity to <i id="sar-q"></i>. We embed <span class="mono" id="sar-h"></span> in front of the text. The stored text stays the same.</p>
+    <div class="excerpt" data-x="with_heading"></div>
+  </div>
+
+  <div class="panel" id="t-query">
+    <div class="lane-title"><h3>Query understanding: rules, or an LLM</h3><span class="tag new">New in this session</span></div>
+    <div class="tbl"><table><thead><tr><th>Question</th><th>Rules (regex)</th><th>LLM (one JSON call)</th></tr></thead><tbody id="routing"></tbody></table></div>
+    <div class="two">
+      <div class="callout"><b>Pakistan is not in South Asia here</b><span>The World Bank groups it with the Middle East and North Africa. Without a filter, search returns South Asia passages and the naive answer says "about 4 percent". The LLM saw the region list and routes it correctly: 1.6 percent.</span></div>
+      <div class="callout warn"><b>Lesson from building it</b><span>The first prompt let the LLM guess "Chapter 4" from a question's topic. That filter pushed the answer from rank 1 to rank 2. A wrong filter hides the answer, so the prompt now allows a chapter only when the question names one.</span></div>
+    </div>
+    <div class="two"><div class="excerpt" data-x="understand"></div><div class="excerpt" data-x="to_filter"></div></div>
+  </div>
+
+  <div class="panel" id="t-parents">
+    <h3>Search small, answer from the parent</h3>
+    <div class="two"><div class="nest"><div class="parentbox"><div class="label">Parent section · ~900 tokens · what the model reads</div>
+      <div class="kids"><div class="kid">child · 280 tokens</div><div class="kid hit">child · matched the question</div><div class="kid">child · 280 tokens</div></div></div></div>
+      <div class="lane"><p>Small chunks match a question precisely. Large chunks give the model enough context to answer. So we index the children for search, and hand the model their parent section. <span id="hier-line"></span></p><div class="excerpt" data-x="to_parents"></div></div></div>
+  </div>
+
+  <div class="panel"><h3>What moved the number</h3><p class="muted">One technique added per row. 13 questions.</p><div class="ladder" id="lad-gep"></div>
+    <p class="muted">LLM routing ties the rules on these 13 questions, because they name their regions; it wins on questions that name a country. The last row scores ~900-token parents, a bigger target, so it is not directly comparable.</p></div>
+</section>
+
+<!-- ======================================================= IMAC -->
+<section id="imac">
+  <div class="chapter-head"><div class="num">3</div><div><div class="eyebrow">Short, visual · Apple iMac Product Environmental Report · 12 pages</div><h2>Every word extracted, relationships lost</h2></div>
+    <p class="shape lead">Designed like a brochure. Facts sit in tables, call-outs, a bar chart and numbered endnotes. Text extraction gets the words but not which value belongs to which column.</p></div>
+  <div class="problem-list">
+    <div class="pf"><span class="x">✕</span><span>Value separated from its column</span><span class="o">✓</span><span>Rebuild tables under their header bars</span></div>
+    <div class="pf"><span class="x">✕</span><span>Caveat on a different page</span><span class="o">✓</span><span>Link footnote markers to endnotes</span></div>
+    <div class="pf"><span class="x">✕</span><span>Tables cut by character count</span><span class="o">✓</span><span>One chunk per element</span></div>
+    <div class="pf"><span class="x">✕</span><span>A chart tells a story the text doesn't</span><span class="o">✓</span><span>A vision model describes it</span></div>
+  </div>
+
+  <div class="panel" id="t-tables">
+    <h3>Tables</h3>
+    <div class="two"><div><div class="label">Plain extraction, page 10, in output order</div><pre class="code" id="imac-raw" style="max-height:330px"></pre></div>
+      <div><div class="label">Rebuilt: every value next to its heading</div><pre class="code" id="imac-tab" style="max-height:330px"></pre></div></div>
+    <p class="muted">PyMuPDF's own table finder returned 3 one-row fragments. Every table here sits under a dark header bar, so we find the bars in the page's drawings and rebuild rows from word positions. The idea transfers; the thresholds were tuned on this PDF.</p>
+  </div>
+
+  <div class="panel" id="t-notes">
+    <h3>Footnotes travel with the claim</h3>
+    <div class="two"><div><div class="label">Raw page 7: the marker becomes a stray digit</div><div class="quote bad-l" id="fn-raw"></div></div>
+      <div><div class="label">The chunk we index</div><div class="quote good-l"><span id="fn-claim"></span><br><br><b id="fn-note"></b></div></div></div>
+    <div class="excerpt" data-x="element_chunks"></div>
+  </div>
+
+  <div class="panel" id="t-vision">
+    <h3>Vision: what the chart says</h3>
+    <div class="two"><div class="quote" id="vision"></div>
+      <div class="stats" id="el-stats" style="grid-template-columns: 1fr 1fr 1fr"></div></div>
+    <p class="muted">The labels are extractable. That 445 kg minus 99 kg of reductions gives 346 kg is not. One Gemini call per visual page, cached.</p>
+    <div class="excerpt" data-x="vision_chunks"></div>
+  </div>
+
+  <div class="panel"><h3>What moved the number</h3><p class="muted">11 questions.</p><div class="ladder" id="lad-imac"></div>
+    <p class="muted">The plain-text recipe misses the chart and footnote questions. The reranker made things worse: it was trained on prose and under-rates table chunks. Measure on your own documents.</p></div>
+</section>
+
+<!-- ======================================================= COMPARE -->
+<section id="compare">
+  <div class="head"><div class="eyebrow">Before and after</div><h2>The same questions, with everything we built</h2>
+    <p class="lead">Same model, same database. Only the pipeline differs. Each step in the trace is one of the techniques from the three chapters.</p></div>
+  <div class="stats" id="stats"></div>
+  <div class="panel">
+    <div class="showq"><label class="label" for="showq">Pick a question</label><select id="showq"></select></div>
+    <div class="two" id="showcase"></div>
+  </div>
+</section>
+
+<!-- ======================================================= SCORE -->
+<section id="score">
+  <div class="head"><div class="eyebrow">Scorecard</div><h2>The harder the document, the bigger the gap</h2></div>
+  <div class="panel"><div class="ladder" id="scorebars"></div>
+    <div class="tbl"><table><thead><tr><th>Document</th><th>MRR naive</th><th>MRR advanced</th><th>Answers naive</th><th>Answers advanced</th></tr></thead><tbody id="scoretable"></tbody></table></div></div>
+  <div class="two">
+    <div class="callout"><b>Read it honestly</b><span>10 to 14 hand-checked questions per document. Good enough to see large effects, not to rank close options. Treat differences under about 0.1 as noise.</span></div>
+    <div class="callout"><b>On easy text, the embedding model matters most</b><span>With Gemini embeddings, the naive GPO pipeline already reaches 0.73. The techniques pay off as documents get harder.</span></div>
+  </div>
+</section>
+
+<!-- ======================================================= NEXT -->
+<section id="next">
+  <div class="head"><div class="eyebrow">What's next</div><h2>Beyond today</h2></div>
+  <div class="next">
+    <div class="panel"><h3>More query transformations</h3><p>Multi-query (ask several phrasings), HyDE (search with a drafted answer), decomposition (split a two-part question). Same place in the pipeline as our LLM step.</p></div>
+    <div class="panel"><h3>Agentic and corrective RAG</h3><p>Let the model grade what it retrieved and search again when it is not enough. Turns the straight pipeline into a loop.</p></div>
+    <div class="panel"><h3>GraphRAG</h3><p>Extract entities and relations, then answer questions that span many documents ("which suppliers appear in both reports?").</p></div>
+    <div class="panel"><h3>Evaluation at scale</h3><p>We used 37 hand-checked questions. In production, add an LLM-as-judge on answers and track retrieval metrics on every change.</p></div>
+    <div class="panel"><h3>Long context instead?</h3><p>One 12-page PDF fits in a prompt. Thousands of documents do not, cost grows per question, and models still miss buried facts. Retrieval also gives citations.</p></div>
+    <div class="panel"><h3>Frameworks</h3><p>LangChain, rebuilt with the same parts, scored MRR 0.95 against our 0.74 on the GPO report, thanks to its smaller default chunks. No framework did the parsing in chapters 2 and 3. Measure.</p></div>
+  </div>
+</section>
+
+</main>
+<footer><div class="wrap">Every number on this page was measured on 37 hand-checked questions across the three reports. Models: BAAI bge-small embeddings, Qdrant BM25, MiniLM cross-encoder (all local), Groq gpt-oss-120b for answers, Gemini Flash-Lite for vision.</div></footer>
+
+<script type="application/json" id="data">{"reading": {"common": "A Message from the Acting Deputy Director Among the many highlights of GPO’s work during The United States Government FY 2018 are some of the important publications we Publishing Office (GPO) posted produced for Congress, including the Congressional another year of solid gains in FY 2018, Pictorial Directory for the 115th Congress, the 1,242- a year in which we bid farewell to page Official Congressional Directory for the 115th our esteemed Director Davita Vance- Congress, and Asian and Pacific Islander Americans i", "ours": "A Message from the Acting Deputy Director The United States Government Publishing Office (GPO) posted another year of solid gains in FY 2018, a year in which we bid farewell to our esteemed Director Davita Vance- Cooks and thanked her for her years of exceptional service. Following Davita’s departure, GPO was fortunate to be led by Jim Bradley, Andy Sherman, and then Herb Jackson, three dedicated public servants who collectively devoted nearly a century of service to this agency. Now that I have the honor of servin"}, "chunk_text": "A Message from the Acting Deputy Director The United States Government Publishing Office (GPO) posted another year of solid gains in FY 2018, a year in which we bid farewell to our esteemed Director Davita Vance- Cooks and thanked her for her years of exceptional service. Following Davita’s departure, GPO was fortunate to be led by Jim Bradley, Andy Sherman, and then Herb Jackson, three dedicated public servants who collectively devoted nearly a century of service to this agency. Now that I have the honor of serving as Acting Deputy Director of GPO, I want to thank all GPO employees for their hard work during the past year. Without question FY 2018 was a year of change at GPO, but what didn’t change was our collective commitment to providing the best service to Congress, our Federal agency partners, and the general public as we work to fulfill our mission of Keeping America Informed. President Donald J. Trump’s budget for the Federal Government on GPO’s binding line. Among the many highlights of GPO’s work during FY 2018 are some of the important publications we produced for Congress, including the Congressional Pictorial Directory for the 115th Congress, the 1,242- page Official Congressional Directory for the 115th Congress, and Asian and Pacific Islander Americans in Congress, 1900-2017. We were also honored to produce printed materials in support of significant public events, including the Congressional Gold Medal Ceremony to honor Senator Robert J. Dole and the Senate Ju", "chunk_stats": {"naive": {"chunks": 162, "end_sentence": 2}, "sentence": {"chunks": 102, "end_sentence": 80}}, "rrf": {"question": "How many copies of how many titles did GPO distribute to depository libraries in FY 2018?", "dense": [{"id": 2, "page": 5, "text": "… In addition, GPO distributed 802,834 copies of 4,211 titles to depository libraries nationwide in FY 2018, while also cataloging a total of 34,367 titles. GPO’s faciliti", "fact": true}, {"id": 31, "page": 23, "text": "USLM also promotes international interoperability with documents produced by governments world-wide. GPO has continued to invest in the IT infrastructure supporting GPO’s", "fact": false}, {"id": 16, "page": 13, "text": "In addition to the files made available through our Bulk Data Repository, we ensure the authenticity of all information by making available digitally signed copies in PDF", "fact": false}, {"id": 23, "page": 19, "text": "digital and, in some cases tangible formats, and the libraries in turn make them available to the public at no charge while providing additional assistance to depository ", "fact": false}, {"id": 25, "page": 20, "text": "Preservation Stewards contribute significantly to the effort to preserve printed documents and GPO welcomes all Federal depository libraries that wish to participate as P", "fact": false}, {"id": 26, "page": 20, "text": "During FY 2018, the FDLP Academy hosted 85 webinars with 10,214 combined registrants. GPO also pursued the second year of its FDLP 18 (Above) Bookbinder Matt McKeon opera", "fact": false}, {"id": 7, "page": 8, "text": "Since that time, GPO has produced and distributed the official version of every great American state paper and an uncounted number of other Government publications, docum", "fact": false}, {"id": 22, "page": 18, "text": "Deputy Assistant Secretary of State for Passport Services Brenda Sprague thanks GPO employees for their commitment to the production of the U.S. passport. 16 GPO and Open", "fact": false}], "bm25": [{"id": 23, "page": 19, "text": "digital and, in some cases tangible formats, and the libraries in turn make them available to the public at no charge while providing additional assistance to depository ", "fact": false}, {"id": 16, "page": 13, "text": "In addition to the files made available through our Bulk Data Repository, we ensure the authenticity of all information by making available digitally signed copies in PDF", "fact": false}, {"id": 2, "page": 5, "text": "… In addition, GPO distributed 802,834 copies of 4,211 titles to depository libraries nationwide in FY 2018, while also cataloging a total of 34,367 titles. GPO’s faciliti", "fact": true}, {"id": 1, "page": 4, "text": "President Donald J. Trump’s budget for the Federal Government on GPO’s binding line. Among the many highlights of GPO’s work during FY 2018 are some of the important publ", "fact": false}, {"id": 25, "page": 20, "text": "Preservation Stewards contribute significantly to the effort to preserve printed documents and GPO welcomes all Federal depository libraries that wish to participate as P", "fact": false}, {"id": 53, "page": 38, "text": "This unit also offers website content updates for existing Federal agency customers who are required to utilize within-government digital media services for information d", "fact": false}, {"id": 5, "page": 7, "text": "Under Title 44 of the U.S. Code, GPO is responsible for the production and distribution of information products for all three branches of the Government, including the of", "fact": false}, {"id": 32, "page": 23, "text": "Agency Distribution Services (ADS) Program GPO operates two distribution facilities strategically located in Laurel, MD (30 miles from Washington, DC) and Pueblo, CO (115", "fact": false}], "rerank": [{"id": 2, "page": 5, "text": "… In addition, GPO distributed 802,834 copies of 4,211 titles to depository libraries nationwide in FY 2018, while also cataloging a total of 34,367 titles. GPO’s faciliti", "fact": true, "score": 7.05}, {"id": 16, "page": 13, "text": "In addition to the files made available through our Bulk Data Repository, we ensure the authenticity of all information by making available digitally signed copies in PDF", "fact": false, "score": 6.41}, {"id": 23, "page": 19, "text": "digital and, in some cases tangible formats, and the libraries in turn make them available to the public at no charge while providing additional assistance to depository ", "fact": false, "score": 5.9}, {"id": 27, "page": 21, "text": "The visits have been influential in strengthening the ties between GPO and its partner libraries and in helping GPO identify current trends and issues in libraries in ord", "fact": false, "score": 5.29}, {"id": 5, "page": 7, "text": "Under Title 44 of the U.S. Code, GPO is responsible for the production and distribution of information products for all three branches of the Government, including the of", "fact": false, "score": 5.24}, {"id": 1, "page": 4, "text": "President Donald J. Trump’s budget for the Federal Government on GPO’s binding line. Among the many highlights of GPO’s work during FY 2018 are some of the important publ", "fact": false, "score": 5.08}, {"id": 25, "page": 20, "text": "Preservation Stewards contribute significantly to the effort to preserve printed documents and GPO welcomes all Federal depository libraries that wish to participate as P", "fact": false, "score": 4.37}, {"id": 31, "page": 23, "text": "USLM also promotes international interoperability with documents produced by governments world-wide. GPO has continued to invest in the IT infrastructure supporting GPO’s", "fact": false, "score": 4.28}], "fused_ids": [2, 23, 16, 31, 25, 1, 26, 27]}, "ligature": {"raw": "ajor shock. Te conﬂict in the Middle East has triggered sharp increases in energy prices, renewed inﬂationary pressures, and fueled expectations of tighter monetary policy. Global growth is projected to slow to 2.5 percent in 2026, from 2.9 percent in 2025—the lowest ra", "fixed": "ajor shock. The conflict in the Middle East has triggered sharp increases in energy prices, renewed inflationary pressures, and fueled expectations of tighter monetary policy. Global growth is projected to slow to 2.5 percent in 2026, from 2.9 percent in 2025—the lowest ra"}, "sar": {"text": "Growth in SAR is expected to soften to 6.3 percent in 2026, mainly reflecting the adverse impact of the conflict in the Middle East, including higher energy prices, reduced supplies of oil and natural gas, and disruptions to remittances and tourism (table 2.9). Nevertheless, the growth forecast has been marginally upgraded since", "heading": "Chapter 2: Regional Outlooks > South Asia > Outlook", "question": "What is the growth outlook for South Asia in this report?", "rank_plain": 2, "rank_heading": 2, "sim_plain": 0.75, "sim_heading": 0.803}, "routing": [{"q": "What is the growth outlook for South Asia in this report?", "rules": {"region": "South Asia"}, "llm": {"region": "South Asia"}, "rewrite": "growth outlook for South Asia projected growth 2026"}, {"q": "What does Chapter 3 say about sovereign debt in developing economies?", "rules": {"chapter": 3}, "llm": {"chapter": 3}, "rewrite": "Chapter 3 sovereign debt developing economies"}, {"q": "What is India's projected growth for fiscal year 2026/27?", "rules": {}, "llm": {"region": "South Asia"}, "rewrite": "India projected growth fiscal year 2026/27"}, {"q": "What growth is projected in 2026 for the region that includes Pakistan?", "rules": {}, "llm": {"region": "Middle East, North Africa, Afghanistan, and Pakistan"}, "rewrite": "projected growth 2026 for Middle East, North Africa, Afghanistan, and Pakistan"}, {"q": "What does the report say about Brazil?", "rules": {}, "llm": {"region": "Latin America and the Caribbean"}, "rewrite": "Brazil projected growth 2026 World Bank Global Economic Prospects report"}, {"q": "What is the outlook for SSA?", "rules": {"region": "Sub-Saharan Africa"}, "llm": {"region": "Sub-Saharan Africa"}, "rewrite": "outlook for Sub-Saharan Africa projected growth 2026 World Bank Global Economic Prospects"}], "hierarchy": {"children": 531, "parents": 184, "sections": 111, "naive": 696}, "showcase": [{"doc": "gep", "q": "What is the growth outlook for South Asia in this report?", "naive": {"answer": "The report projects that South Asia’s real GDP growth will rise to about 4 percent in 2026 (up from 3.9 percent in 2025) and is expected to rebound again in 2027‑28 as external demand recovers[2]. The detailed forecast table shows a forecast of roughly 3.9 percent for 2026 for the SAR region (excluding India) and a modest increase to around 4.0‑4.1 percent in the following years[4].", "pages": [97, 96, 97, 98, 95], "trace": [["Retrieve", "Dense search over 696 fixed-size chunks: top 5"], ["Generate", "Grounded prompt with 5 numbered passages: cite them, or refuse"]]}, "advanced": {"answer": "The report projects that South Asia’s growth will slow to about 6.3 percent in 2026, then rebound to an average of roughly 7 percent per year in 2027‑28, with the region (excluding India) expected to grow around 4 percent in 2026 after a modest rise from 3.9 percent in 2025[1].", "pages": [96, 97], "trace": [["Query", "LLM read the question: region=South Asia"], ["Query", "Rewritten for search: \"growth outlook for South Asia projected growth 2026\""], ["Retrieve", "Hybrid search over 531 heading-tagged chunks: shortlist of 7"], ["Post-process", "Cross-encoder reranked the shortlist, kept the top 5"], ["Post-process", "Swapped the small chunks for their 2 parent sections (~900 tokens each)"], ["Generate", "Grounded prompt with 2 numbered passages: cite them, or refuse"]]}}, {"doc": "gep", "q": "What growth is projected in 2026 for the region that includes Pakistan?", "naive": {"answer": "The projection for 2026 is a growth rate of about 4 percent for the region that includes Pakistan[1].", "pages": [96, 51, 95, 190, 71], "trace": [["Retrieve", "Dense search over 696 fixed-size chunks: top 5"], ["Generate", "Grounded prompt with 5 numbered passages: cite them, or refuse"]]}, "advanced": {"answer": "Growth in the region that includes Pakistan is projected to be 1.6 percent in 2026[1].", "pages": [92, 93], "trace": [["Query", "LLM read the question: region=Middle East, North Africa, Afghanistan, and Pakistan"], ["Query", "Rewritten for search: \"projected growth 2026 for Middle East, North Africa, Afghanistan, and Pakistan\""], ["Retrieve", "Hybrid search over 531 heading-tagged chunks: shortlist of 7"], ["Post-process", "Cross-encoder reranked the shortlist, kept the top 5"], ["Post-process", "Swapped the small chunks for their 2 parent sections (~900 tokens each)"], ["Generate", "Grounded prompt with 2 numbered passages: cite them, or refuse"]]}}, {"doc": "gep", "q": "According to the executive summary, what are the main risks to the global outlook?", "naive": {"answer": "The executive summary identifies the chief risks as a combination of climate‑related threats – rising global temperatures that increase the frequency and severity of weather‑related disasters – and heightened geopolitical stress, especially the conflict in the Middle East that has closed key shipping routes, driven up oil, gas and fertilizer prices and could further tighten financial conditions, worsening inflation and growth worldwide[1][4].", "pages": [53, 195, 52, 52, 74], "trace": [["Retrieve", "Dense search over 696 fixed-size chunks: top 5"], ["Generate", "Grounded prompt with 5 numbered passages: cite them, or refuse"]]}, "advanced": {"answer": "The executive summary says the outlook is vulnerable to a “renewed escalation of hostilities or more prolonged disruptions to commodity flows,” which could push commodity prices higher, intensify inflation and food insecurity, trigger financial stress and lower growth.  It also flags “persistent trade‑policy uncertainty, geopolitical strains and weather‑related shocks” as additional downside risks[1].", "pages": [19, 19, 21], "trace": [["Query", "LLM read the question: executive_summary=True"], ["Query", "Rewritten for search: \"executive summary main risks to the global outlook\""], ["Retrieve", "Hybrid search over 531 heading-tagged chunks: shortlist of 9"], ["Post-process", "Cross-encoder reranked the shortlist, kept the top 5"], ["Post-process", "Swapped the small chunks for their 3 parent sections (~900 tokens each)"], ["Generate", "Grounded prompt with 3 numbered passages: cite them, or refuse"]]}}, {"doc": "imac", "q": "What was the baseline emissions figure for iMac, and how many kilograms did the reductions remove?", "naive": {"answer": "The document lists a baseline emissions figure of 445 kg CO₂e for the iMac [1]. Apple reports that emissions have been reduced by “more than 20 percent” for the iMac (two ports) 256 GB configuration, but it does not give the exact kilogram amount removed [1].", "pages": [1, 9, 11, 1, 11], "trace": [["Retrieve", "Dense search over 25 fixed-size chunks: top 5"], ["Generate", "Grounded prompt with 5 numbered passages: cite them, or refuse"]]}, "advanced": {"answer": "The baseline emissions were 445 kg CO₂e, and the emissions reductions removed about 99 kg CO₂e[4][3].", "pages": [10, 10, 2, 2, 2], "trace": [["Retrieve", "Hybrid search over element chunks (3 tables, 24 prose, 10 vision descriptions): top 5"], ["Post-process", "No rerank here: the reranker was trained on prose and under-rates table chunks"], ["Generate", "Grounded prompt with 5 numbered passages: cite them, or refuse"]]}}, {"doc": "imac", "q": "What share of iMac manufacturing electricity comes from renewable sources, and what does the footnote say about how that is measured?", "naive": {"answer": "I could not find this in the document.", "pages": [9, 11, 1, 11, 6], "trace": [["Retrieve", "Dense search over 25 fixed-size chunks: top 5"], ["Generate", "Grounded prompt with 5 numbered passages: cite them, or refuse"]]}, "advanced": {"answer": "Over 20 % of the iMac’s manufacturing electricity is sourced from renewable energy[2][4].  \n\nThe footnote explains that this percentage is estimated by attributing to Apple’s carbon model the low‑carbon electricity procured by its suppliers in the prior fiscal year, using the suppliers’ manufacturing allocations at the time the product launched[2].", "pages": [2, 1, 2, 1, 5], "trace": [["Retrieve", "Hybrid search over element chunks (3 tables, 24 prose, 10 vision descriptions): top 5"], ["Post-process", "No rerank here: the reranker was trained on prose and under-rates table chunks"], ["Generate", "Grounded prompt with 5 numbered passages: cite them, or refuse"]]}}, {"doc": "gpo", "q": "What was GPO's total revenue in FY 2020?", "naive": {"answer": "I could not find this in the document.", "pages": [26, 26, 26, 25, 72], "trace": [["Retrieve", "Dense search over 162 fixed-size chunks: top 5"], ["Generate", "Grounded prompt with 5 numbered passages: cite them, or refuse"]]}, "advanced": {"answer": "I could not find this in the document.", "pages": [25, 6, 18, 25, 13], "trace": [["Retrieve", "Hybrid search (dense + BM25, fused with RRF) over 102 sentence-aware chunks: shortlist of 20"], ["Post-process", "Cross-encoder reranked the shortlist, kept the top 5"], ["Generate", "Grounded prompt with 5 numbered passages: cite them, or refuse"]]}}], "imac_raw": ["512GB", "iMac (four ports) 512GB", "391 kg CO2e", "Greenhouse gas emissions were calculated using a life cycle assessment (LCA) methodology in ", "accordance with ISO 14040, ISO 14044, and ISO 14067 standards and based on iMac. The LCA ", "boundary for this product includes the physical product and all of its components, packaging, as ", "well as all in-box accessories (such as power cords).", "Greenhouse gas emissions", "iMac (two ports)", "256GB", "Total product footprint", "346 kg CO2e", "Apple emissions from utility-purchased electricity (scope 2)", "0 kg CO2e", "Life cycle product emissions (scope 3)", "346 kg CO2e", "• Production", "50%", "• Transportation", "5%", "• Product use", "45%"], "imac_tables": ["Table: Greenhouse gas emissions. Column: iMac (two ports) 256GB\nTotal product footprint: 346 kg CO2e\nApple emissions from utility-purchased electricity (scope 2): 0 kg CO2e\nLife cycle product emissions (scope 3): 346 kg CO2e\n• Production: 50%\n• Transportation: 5%\n• Product use: 45%\n• End-of-life processing: <1%\nGHG reductions achieved[^7]: ↓>20%", "Table: Configuration. Column: iMac (four ports) 512GB\niMac (four ports) 512GB: 391 kg CO2e"], "footnote": {"claim": "Use iMac uses 58 percent less energy than the requirement for ENERGY STAR. We design our products to be energy efficient, long-lasting, and safe. iMac uses software and power-efficient components that intelligently manage power consumption.", "note": "[Note 18] Energy consumption and energy efficiency values are based on the ENERGY STAR Program Requirements for Computers, including the max energy allowance for iMac. For more information, visit www.energystar.gov. ENERGY STAR and the ENERGY STAR mark are registered trademarks owned by the U.S. Env", "raw": "duct Environmental Report 7 Use iMac uses 58 percent less energy than the requirement for ENERGY STAR.18"}, "vision": "The document titled \"Progress toward carbon neutral\" details the emissions breakdown and reductions for the iMac (two ports) with 256GB. The chart presents three vertical bars with the following components: **Baseline emissions [note 7] (445 kg):** - Materials and process emissions: pink segment at the top. - Electricity for manufacturing: yellow segment in the middle. - Electricity for product use: large yellow segment spanning the lower-middle portion. - Transportation: blue segment at the bottom. **Emissions reductions (-99 kg):** - Recycled and low-carbon materials [note 8]: top dashed purple segment. - Materials and process emissions: solid purple segment. - Low-carbon electricity [note 9]: dashed yellow segment. - Electricity for manufacturing: solid yellow segment. - Electricity for product use: solid yellow segment. - Non-air shipping: dashed blue segment at the bottom. - Transpo", "imac_counts": {"table": 3, "text": 24, "vision": 10}, "results": {"uc1": {"title": "Plain text: GPO 2018 Annual Report", "embedder": "local-bge-small-en-v1.5-384", "naive": {"hit@1": 0.2, "hit@3": 0.7, "hit@5": 0.8, "MRR": 0.42}, "advanced": {"hit@1": 0.6, "hit@3": 0.9, "hit@5": 1.0, "MRR": 0.74}, "answers": {"B1": {"naive": true, "advanced": true}, "B2": {"naive": true, "advanced": true}, "B3": {"naive": true, "advanced": true}, "S1": {"naive": true, "advanced": true}, "S2": {"naive": true, "advanced": true}, "S3": {"naive": true, "advanced": true}, "S4": {"naive": true, "advanced": true}, "S5": {"naive": true, "advanced": true}, "S6": {"naive": false, "advanced": true}, "S7": {"naive": true, "advanced": true}, "R1": {"naive": true, "advanced": true}}, "ladder": {"A naive chunks, dense": {"hit@1": 0.2, "hit@3": 0.7, "hit@5": 0.8, "MRR": 0.42}, "B sentence chunks, dense": {"hit@1": 0.5, "hit@3": 0.9, "hit@5": 0.9, "MRR": 0.67}, "C + hybrid": {"hit@1": 0.5, "hit@3": 0.8, "hit@5": 0.9, "MRR": 0.64}, "D + rerank top 20": {"hit@1": 0.6, "hit@3": 0.9, "hit@5": 1.0, "MRR": 0.74}}}, "uc2": {"title": "Long, structured: World Bank GEP, June 2026", "embedder": "local-bge-small-en-v1.5-384", "naive": {"hit@1": 0.23, "hit@3": 0.31, "hit@5": 0.31, "MRR": 0.26}, "advanced": {"hit@1": 0.54, "hit@3": 1.0, "hit@5": 1.0, "MRR": 0.76}, "ladder": {"1 naive 1000-char chunks": {"hit@1": 0.23, "hit@3": 0.31, "hit@5": 0.31, "MRR": 0.26}, "2 section-aware chunks": {"hit@1": 0.31, "hit@3": 0.54, "hit@5": 0.54, "MRR": 0.42}, "3 + heading path embedded": {"hit@1": 0.31, "hit@3": 0.54, "hit@5": 0.77, "MRR": 0.46}, "4 + hybrid": {"hit@1": 0.31, "hit@3": 0.62, "hit@5": 0.85, "MRR": 0.49}, "5 + routing (rules)": {"hit@1": 0.38, "hit@3": 0.62, "hit@5": 0.92, "MRR": 0.56}, "6 + rerank (rules)": {"hit@1": 0.54, "hit@3": 1.0, "hit@5": 1.0, "MRR": 0.76}, "5 + routing (LLM)": {"hit@1": 0.31, "hit@3": 0.77, "hit@5": 0.92, "MRR": 0.54}, "6 + rerank (LLM)": {"hit@1": 0.54, "hit@3": 1.0, "hit@5": 1.0, "MRR": 0.76}, "7 + parents (what the LLM sees)": {"hit@1": 0.77, "hit@3": 1.0, "hit@5": 1.0, "MRR": 0.88}}, "answers": {"B1": {"naive": false, "advanced": true}, "B2": {"naive": false, "advanced": false}, "B3": {"naive": false, "advanced": true}, "S1": {"naive": false, "advanced": true}, "S2": {"naive": true, "advanced": true}, "S3": {"naive": true, "advanced": true}, "S4": {"naive": false, "advanced": true}, "S5": {"naive": true, "advanced": true}, "S6": {"naive": false, "advanced": true}, "S7": {"naive": true, "advanced": true}, "S8": {"naive": false, "advanced": true}, "S9": {"naive": true, "advanced": true}, "S10": {"naive": true, "advanced": true}, "R1": {"naive": true, "advanced": true}}}, "uc3": {"title": "Short, visual: Apple iMac Environmental Report", "embedder": "local-bge-small-en-v1.5-384", "naive": {"hit@1": 0.45, "hit@3": 0.82, "hit@5": 0.82, "MRR": 0.62}, "advanced": {"hit@1": 0.73, "hit@3": 1.0, "hit@5": 1.0, "MRR": 0.85}, "ladder": {"1 naive 1000-char chunks, dense": {"hit@1": 0.45, "hit@3": 0.82, "hit@5": 0.82, "MRR": 0.62}, "2 plain-text recipe (sentences, hybrid, rerank)": {"hit@1": 0.73, "hit@3": 0.82, "hit@5": 0.82, "MRR": 0.77}, "3 element chunks, dense": {"hit@1": 0.82, "hit@3": 1.0, "hit@5": 1.0, "MRR": 0.91}, "4 element chunks, hybrid": {"hit@1": 0.82, "hit@3": 1.0, "hit@5": 1.0, "MRR": 0.91}, "5 element chunks, hybrid, rerank": {"hit@1": 0.64, "hit@3": 1.0, "hit@5": 1.0, "MRR": 0.8}, "6 elements + vision, hybrid": {"hit@1": 0.73, "hit@3": 1.0, "hit@5": 1.0, "MRR": 0.85}}, "answers": {"B1": {"naive": true, "advanced": true}, "B2": {"naive": true, "advanced": true}, "B3": {"naive": true, "advanced": true}, "S1": {"naive": true, "advanced": true}, "S2": {"naive": true, "advanced": true}, "S3": {"naive": false, "advanced": true}, "S4": {"naive": true, "advanced": true}, "S5": {"naive": true, "advanced": true}, "S6": {"naive": true, "advanced": true}, "S7": {"naive": false, "advanced": true}, "S8": {"naive": true, "advanced": true}, "R1": {"naive": true, "advanced": true}}}}, "code": {"sentence_chunks": {"file": "src/rag/chunking.py", "line": 58, "code": "def sentence_chunks(pages, target=450, overlap=60):\n    \"\"\"Whole sentences only, about `target` tokens each. The last ~`overlap` tokens\n    repeat at the start of the next chunk, so a fact near a boundary appears whole somewhere.\"\"\"\n    sents = [(s, p[\"page\"]) for p in pages for s in split_sentences(p[\"text\"])]\n    chunks, current, size = [], [], 0\n\n    def close():\n        nonlocal current, size\n        chunks.append({\"id\": len(chunks), \"text\": \" \".join(s for s, _ in current),\n                       \"page_start\": current[0][1], \"page_end\": current[-1][1]})\n        keep, kept = [], 0\n        for s, pg in reversed(current):           # carry the tail over as overlap\n            if kept + tokens(s) > overlap:\n                break\n            keep.insert(0, (s, pg))\n            kept += tokens(s)\n        current, size = keep, kept\n\n    for s, pg in sents:\n        if size + tokens(s) > target and size > overlap:\n            close()\n        current.append((s, pg))\n        size += tokens(s)\n    if size > overlap or not chunks:\n        close()\n    return chunks\n"}, "hybrid_search": {"file": "src/rag/retrieve.py", "line": 23, "code": "def hybrid_search(index, question, k=5, where=None):\n    \"\"\"Run both searches, then merge the two ranked lists with Reciprocal Rank Fusion:\n    each chunk scores 1/(rank + 1) in each list, and the scores are added. Ranks, not raw\n    scores, so the two lists need no common scale. (Qdrant's default; the original paper used 1/(rank + 60).)\"\"\"\n    pool = max(k * 4, 20)\n    res = index.client.query_points(\n        index.name,\n        prefetch=[models.Prefetch(query=index.embedder.query(question), using=\"dense\", limit=pool, filter=where),\n                  models.Prefetch(query=index.bm25_query(question), using=\"bm25\", limit=pool, filter=where)],\n        query=models.FusionQuery(fusion=models.Fusion.RRF),\n        limit=k, with_payload=True)\n    return [p.payload for p in res.points]\n"}, "rerank": {"file": "src/rag/postprocess.py", "line": 20, "code": "def rerank(question, hits, k=5):\n    \"\"\"A cross-encoder reads the question and each passage together and scores the pair.\n    Slower than vector search, so we only run it on a shortlist.\"\"\"\n    if not hits:\n        return []\n    scores = list(cross_encoder().rerank(question, [h[\"text\"] for h in hits]))\n    ranked = sorted(zip(scores, hits), key=lambda pair: pair[0], reverse=True)\n    return [h for _, h in ranked[:k]]\n"}, "ask": {"file": "src/rag/generate.py", "line": 23, "code": "def ask(question, hits):\n    \"\"\"Let the model answer from the numbered passages only.\"\"\"\n    return chat(SYSTEM_PROMPT, f\"Context passages:\\n\\n{build_context(hits)}\\n\\nQuestion: {question}\")\n"}, "build_context": {"file": "src/rag/generate.py", "line": 16, "code": "def build_context(hits):\n    \"\"\"Number the passages and show where each came from, so the answer can cite them.\"\"\"\n    return \"\\n\\n\".join(\n        f\"[{i}] (pages {h['page_start']}-{h['page_end']}{', ' + h['heading_path'] if h.get('heading_path') else ''})\\n{h['text']}\"\n        for i, h in enumerate(hits, start=1))\n"}, "with_heading": {"file": "src/rag/chunking.py", "line": 133, "code": "def with_heading(chunk):\n    \"\"\"What we embed: the heading path travels with the passage.\"\"\"\n    return f\"{chunk['heading_path']}\\n{chunk['text']}\"\n"}, "route_rules": {"file": "src/rag/query.py", "line": 38, "code": "def route_rules(question):\n    \"\"\"Turn place names in the question into filter fields with regular expressions.\"\"\"\n    tags = {}\n\n    def mentions(alias):\n        if len(alias) <= 6 and \" \" not in alias and alias != \"mena\":   # acronyms must be upper-case: \"SAR\", \"EAP\"\n            return re.search(rf\"\\b{alias.upper()}\\b\", question)\n        return re.search(rf\"\\b{re.escape(alias)}\\b\", question, re.IGNORECASE)\n\n    regions = [r for r, aliases in REGIONS.items() if any(mentions(a) for a in aliases)]\n    if len(regions) == 1:\n        tags[\"region\"] = regions[0]\n    if re.search(r\"\\bexecutive summary\\b\", question, re.IGNORECASE):\n        tags[\"executive_summary\"] = True\n    elif m := re.search(r\"\\bchapter\\s+(\\d)\\b\", question, re.IGNORECASE):\n        tags[\"chapter\"] = int(m.group(1))\n    if re.search(r\"\\bbox\\s+\\d\\.\\d\\b\", question, re.IGNORECASE):\n        tags[\"box\"] = True\n    return tags\n"}, "understand": {"file": "src/rag/query.py", "line": 83, "code": "def understand(question):\n    \"\"\"One LLM call: question -> filter fields + a search-friendly rewrite. Unknown values are dropped.\"\"\"\n    reply = chat(QUERY_PROMPT, question)\n    found = re.search(r\"\\{.*\\}\", reply, flags=re.DOTALL)\n    data = json.loads(found.group(0)) if found else {}\n    tags = {}\n    if data.get(\"region\") in REGIONS:                                  # never trust a name we did not list\n        tags[\"region\"] = data[\"region\"]\n    if data.get(\"executive_summary\") is True:\n        tags[\"executive_summary\"] = True\n    elif data.get(\"chapter\") in (1, 2, 3, 4):\n        tags[\"chapter\"] = data[\"chapter\"]\n    if data.get(\"box\") is True:\n        tags[\"box\"] = True\n    return tags, (data.get(\"search_query\") or question).strip()\n"}, "to_filter": {"file": "src/rag/query.py", "line": 23, "code": "def to_filter(region=None, chapter=None, executive_summary=False, box=False):\n    \"\"\"Metadata -> Qdrant filter. Every chunk was stored with chapter, region and kind.\"\"\"\n    must = []\n    if region:\n        must.append(models.FieldCondition(key=\"region\", match=models.MatchValue(value=region)))\n    if executive_summary:\n        must.append(models.FieldCondition(key=\"chapter\", match=models.MatchValue(value=\"Executive Summary\")))\n    elif chapter:\n        must.append(models.FieldCondition(key=\"chapter_no\", match=models.MatchValue(value=int(chapter))))\n    if box:\n        must.append(models.FieldCondition(key=\"kind\", match=models.MatchValue(value=\"box\")))\n    skip_noise = [models.FieldCondition(key=\"kind\", match=models.MatchAny(any=NOISE))]\n    return models.Filter(must=must or None, must_not=skip_noise)\n"}, "to_parents": {"file": "src/rag/postprocess.py", "line": 30, "code": "def to_parents(hits, parents, n=3):\n    \"\"\"Swap each retrieved child for its parent window. Duplicates are dropped; rank order is kept.\"\"\"\n    out, seen = [], set()\n    for h in hits:\n        if h[\"parent_id\"] in seen:\n            continue\n        seen.add(h[\"parent_id\"])\n        out.append({**h, **parents[h[\"parent_id\"]]})\n        if len(out) == n:\n            break\n    return out\n"}, "element_chunks": {"file": "src/rag/chunking.py", "line": 140, "code": "def element_chunks(path, max_tokens=220):\n    \"\"\"One chunk per table; prose in small sentence groups. Any [^n] marker pulls its endnote into the chunk.\"\"\"\n    doc = pymupdf.open(path)\n    notes = read_endnotes(doc)\n    chunks = []\n\n    def add(text, page, kind):\n        refs = sorted({int(n) for n in re.findall(r\"\\[\\^(\\d+)\\]\", text) if int(n) in notes})\n        body = re.sub(r\"\\[\\^\\d+\\]\", \"\", text).strip()\n        body += \"\".join(f\"\\n[Note {n}] {notes[n][:700]}\" for n in refs)\n        chunks.append({\"id\": len(chunks), \"text\": body, \"page_start\": page, \"page_end\": page, \"kind\": kind,\n                       \"heading_path\": f\"page {page}, {kind}\"})\n\n    for number, page in enumerate(doc, start=1):\n        tables = rebuild_tables(page, number)\n        for t in tables:\n            add(t[\"text\"], number, \"table\")\n        if number >= 11:                                           # the endnote pages themselves\n            continue\n        prose = prose_with_markers(page, [(t[\"top\"] - 6, t[\"bottom\"] + 6) for t in tables])\n        current, size = [], 0\n        for s in split_sentences(prose):\n            if current and size + tokens(s) > max_tokens:\n                add(\" \".join(current), number, \"text\")\n                current, size = [], 0\n            current.append(s)\n            size += tokens(s)\n        if current:\n            add(\" \".join(current), number, \"text\")\n    return chunks, notes\n"}, "vision_chunks": {"file": "src/rag/ingest/visuals.py", "line": 16, "code": "def vision_chunks(path, start_id):\n    \"\"\"Send each page that has images or real vector artwork to the vision model.\"\"\"\n    doc, out = pymupdf.open(path), []\n    for number, page in enumerate(doc, start=1):\n        if not page.get_images() and len(page.get_drawings()) < 5:\n            continue                                               # plain text page: nothing to see\n        text = describe_image(page.get_pixmap(dpi=110).tobytes(\"png\"), VISION_PROMPT)\n        out.append({\"id\": start_id + len(out), \"text\": text, \"page_start\": number, \"page_end\": number,\n                    \"kind\": \"vision\", \"heading_path\": f\"page {number}, vision description\"})\n    return out\n"}, "line_kind": {"file": "src/rag/ingest/structure.py", "line": 52, "code": "def line_kind(text, size, font, bold):\n    \"\"\"This report's typography: body is 11pt Garamond; headings are Helvetica.\"\"\"\n    helvetica = \"Helvetica\" in font\n    if re.match(r\"^(BOX|TABLE|FIGURE)\\s+\\d\", text) and helvetica and bold:\n        return \"caption\"                                          # \"BOX 1.1 How much will AI ...\"\n    if helvetica and bold and size >= 14:\n        return \"section\"                                          # 16pt / 14pt bold: \"South Asia\", \"Global context\"\n    if helvetica and not bold and abs(size - 11) < 0.3 and len(text) < 90 and not text.endswith(\".\"):\n        return \"subsection\"                                       # \"Recent developments\", \"Outlook\"\n    if size < 9.2:\n        return \"small\"                                            # chart labels, table cells, footnotes\n    return \"body\"\n"}, "reading_order": {"file": "src/rag/ingest/layout.py", "line": 16, "code": "def reading_order(blocks):\n    \"\"\"Wide blocks (titles, banners) split the page into bands.\n    Inside each band: the left column top to bottom, then the right column.\"\"\"\n    ordered, band = [], []\n\n    def flush():\n        left = sorted([b for b in band if b[\"left\"]], key=lambda b: b[\"y0\"])\n        right = sorted([b for b in band if not b[\"left\"]], key=lambda b: b[\"y0\"])\n        ordered.extend(left + right)\n        band.clear()\n\n    for b in sorted(blocks, key=lambda b: (b[\"y0\"], b[\"x0\"])):\n        if b[\"wide\"]:\n            flush()\n            ordered.append(b)\n        else:\n            band.append(b)\n    flush()\n    return ordered\n"}, "build_hierarchy": {"file": "src/rag/chunking.py", "line": 116, "code": "def build_hierarchy(sections, child_size=280, parent_size=900):\n    \"\"\"Parents: ~900-token windows inside one section (what the LLM will read).\n    Children: ~280-token pieces of a parent (what we search). Every child knows its location.\"\"\"\n    children, parents = [], {}\n    for s in sections:\n        sentences = [(x, pg) for text, pg in s[\"lines\"] for x in split_sentences(text)]\n        meta = {\"chapter\": s[\"chapter\"], \"chapter_no\": int(m.group(1)) if (m := re.match(r\"Chapter (\\d)\", s[\"chapter\"])) else 0,\n                \"region\": s[\"region\"], \"box\": s[\"box\"], \"kind\": section_kind(s), \"heading_path\": s[\"path\"]}\n        for window in group(sentences, parent_size):\n            pid = len(parents)\n            parents[pid] = {\"text\": \" \".join(x for x, _ in window), \"page_start\": window[0][1], \"page_end\": window[-1][1]}\n            for piece in group(window, child_size, overlap=40):\n                children.append({\"id\": len(children), \"text\": \" \".join(x for x, _ in piece),\n                                 \"page_start\": piece[0][1], \"page_end\": piece[-1][1], \"parent_id\": pid, **meta})\n    return children, parents\n"}, "search": {"file": "src/rag/pipelines.py", "line": 117, "code": "    def search(self, question, k=20, use_llm=True, trace=None):\n        \"\"\"Understand the question, then hybrid search inside the filter it produced.\"\"\"\n        self.ready()\n        where, tags, search_query, how = plan(question, use_llm)\n        _note(trace, \"Query\", f\"{'LLM' if how == 'llm' else 'Rules'} read the question: \"\n                              f\"{', '.join(f'{k}={v}' for k, v in tags.items()) or 'no filter'}\")\n        if search_query != question:\n            _note(trace, \"Query\", f\"Rewritten for search: \\\"{search_query}\\\"\")\n        hits = hybrid_search(self.index, search_query, k, where=where)\n        if len(hits) < 3:                                         # a filter that finds nothing is a bad filter\n            _note(trace, \"Retrieve\", \"Filter matched too little, searching the whole report\")\n            hits = hybrid_search(self.index, search_query, k)\n        _note(trace, \"Retrieve\", f\"Hybrid search over {len(self.children)} heading-tagged chunks: shortlist of {len(hits)}\")\n        return hits\n"}}, "excerpts": {"reading_order": {"file": "src/rag/ingest/layout.py", "line": 22, "name": "reading_order", "code": "left = sorted([b for b in band if b[\"left\"]], key=lambda b: b[\"y0\"])\nright = sorted([b for b in band if not b[\"left\"]], key=lambda b: b[\"y0\"])\nordered.extend(left + right)"}, "sentence_chunks": {"file": "src/rag/chunking.py", "line": 76, "name": "sentence_chunks", "code": "for s, pg in sents:\n    if size + tokens(s) > target and size > overlap:\n        close()\n    current.append((s, pg))\n    size += tokens(s)"}, "hybrid_search": {"file": "src/rag/retrieve.py", "line": 30, "name": "hybrid_search", "code": "prefetch=[models.Prefetch(query=index.embedder.query(question), using=\"dense\", limit=pool, filter=where),\n          models.Prefetch(query=index.bm25_query(question), using=\"bm25\", limit=pool, filter=where)],\nquery=models.FusionQuery(fusion=models.Fusion.RRF),"}, "rerank": {"file": "src/rag/postprocess.py", "line": 25, "name": "rerank", "code": "scores = list(cross_encoder().rerank(question, [h[\"text\"] for h in hits]))\nranked = sorted(zip(scores, hits), key=lambda pair: pair[0], reverse=True)\nreturn [h for _, h in ranked[:k]]"}, "line_kind": {"file": "src/rag/ingest/structure.py", "line": 54, "name": "line_kind", "code": "helvetica = \"Helvetica\" in font\nif re.match(r\"^(BOX|TABLE|FIGURE)\\s+\\d\", text) and helvetica and bold:\n    return \"caption\"                                          # \"BOX 1.1 How much will AI ...\"\nif helvetica and bold and size >= 14:\n    return \"section\"                                          # 16pt / 14pt bold: \"South Asia\", \"Global context\"\nif helvetica and not bold and abs(size - 11) < 0.3 and len(text) < 90 and not text.endswith(\".\"):\n    return \"subsection\"                                       # \"Recent developments\", \"Outlook\""}, "with_heading": {"file": "src/rag/chunking.py", "line": 133, "name": "with_heading", "code": "def with_heading(chunk):\n    \"\"\"What we embed: the heading path travels with the passage.\"\"\"\n    return f\"{chunk['heading_path']}\\n{chunk['text']}\""}, "understand": {"file": "src/rag/query.py", "line": 85, "name": "understand", "code": "reply = chat(QUERY_PROMPT, question)\n…\nif data.get(\"region\") in REGIONS:                                  # never trust a name we did not list\n    tags[\"region\"] = data[\"region\"]"}, "to_filter": {"file": "src/rag/query.py", "line": 26, "name": "to_filter", "code": "if region:\n    must.append(models.FieldCondition(key=\"region\", match=models.MatchValue(value=region)))"}, "to_parents": {"file": "src/rag/postprocess.py", "line": 33, "name": "to_parents", "code": "for h in hits:\n    if h[\"parent_id\"] in seen:\n        continue\n    seen.add(h[\"parent_id\"])\n    out.append({**h, **parents[h[\"parent_id\"]]})"}, "element_chunks": {"file": "src/rag/chunking.py", "line": 147, "name": "element_chunks", "code": "refs = sorted({int(n) for n in re.findall(r\"\\[\\^(\\d+)\\]\", text) if int(n) in notes})\nbody = re.sub(r\"\\[\\^\\d+\\]\", \"\", text).strip()\nbody += \"\".join(f\"\\n[Note {n}] {notes[n][:700]}\" for n in refs)\n…\nfor t in tables:\n    add(t[\"text\"], number, \"table\")"}, "vision_chunks": {"file": "src/rag/ingest/visuals.py", "line": 20, "name": "vision_chunks", "code": "if not page.get_images() and len(page.get_drawings()) < 5:\n    continue                                               # plain text page: nothing to see\ntext = describe_image(page.get_pixmap(dpi=110).tobytes(\"png\"), VISION_PROMPT)"}}, "prompts": {"system": "You answer questions about one document using ONLY the numbered context passages.\n- Use only facts stated in the passages. Never add outside knowledge.\n- Quote numbers, names and dates exactly as written.\n- Cite the passages you used with square brackets only, like [1] or [2][3]. Plain text, no bold.\n- If passages give different figures, report each one with its context.\n- If the passages do not contain the answer, reply exactly: I could not find this in the document.\n- Be brief: one to three sentences.", "query": "You turn a question about the World Bank's Global Economic Prospects report (June 2026)\ninto search instructions. Every passage in the report is tagged with where it lives:\n\n- region (Chapter 2 has one section per region): East Asia and Pacific, Europe and Central Asia, Latin America and the Caribbean, Middle East, North Africa, Afghanistan, and Pakistan, South Asia, Sub-Saharan Africa\n- chapter: 1 Global Outlook, 2 Regional Outlooks, 3 Sovereign Debt Levels and Interest Rates in EMDEs,\n  4 Fiscal Policy and Commodity Price Swings\n- the Executive Summary, and numbered boxes such as \"Box 1.1\"\n\nReply with JSON only:\n{\"region\": \"<one region exactly as listed, or null>\",\n  \"chapter\": <1, 2, 3, 4 or null>,\n  \"executive_summary\": <true or false>,\n  \"box\": <true if the question names a box, else false>,\n  \"search_query\": \"<the question rewritten for search>\"}\n\nRules:\n- Set region when the question names a region OR a country in it (India -> South Asia, Brazil -> Latin America and the Caribbean).\n- Global or multi-region questions get region null.\n- Set chapter only when the question literally says \"Chapter N\". Never infer it from the topic:\n  a wrong filter hides the answer, a missing one only makes search a little slower to find it.\n- search_query: spell out acronyms and use the report's words (EMDEs, outlook, projected growth).\n  Keep every number and year. Do not add the report's title.", "vision": "You are preparing one page of a product report for a search index.\nWrite plain text capturing everything a reader learns from the CHARTS, TABLES, ICONS and CALL-OUTS.\n- Transcribe every number with its label, unit, and the column or group it belongs to.\n- For a chart, say what each bar or segment represents and how the values relate.\n- Mention footnote numbers where they appear, like [note 7].\n- Do not guess values that are not printed. Under 250 words."}}</script>
+<script>
+const D = JSON.parse(document.getElementById("data").textContent);
+const $ = (s, el = document) => el.querySelector(s), $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const STAGE = {"Query": "var(--s-query)", "Retrieve": "var(--s-retrieve)", "Post-process": "var(--s-post)", "Generate": "var(--s-gen)"};
+function pressed(group, btn) { $$("button", group).forEach(b => b.setAttribute("aria-pressed", b === btn)); }
+
+/* ---------- python highlighter */
+function hl(code) {
+  const re = /(#[^\n]*)|("""[\s\S]*?"""|f?"(?:\\.|[^"\\\n])*"|f?'(?:\\.|[^'\\\n])*')|\b(def|return|for|in|if|elif|else|not|and|or|import|from|as|with|None|True|False|lambda|global|nonlocal|break|continue|try|except|class|is|pass|raise)\b|\b(\d+(?:\.\d+)?)\b/g;
+  let out = "", last = 0, m;
+  while ((m = re.exec(code))) {
+    out += esc(code.slice(last, m.index));
+    const cls = m[1] ? "c" : m[2] ? "s" : m[3] ? "k" : "n";
+    out += `<span class="${cls}">${esc(m[0])}</span>`;
+    last = re.lastIndex;
+  }
+  return out + esc(code.slice(last));
+}
+$$(".excerpt[data-x]").forEach(box => { const x = D.excerpts[box.dataset.x];
+  box.innerHTML = `<div class="where">Key lines · ${x.file}:${x.line}</div><pre class="code">${hl(x.code.replace(/ {3,}#/g, "   #"))}</pre>`; });
+
+/* ---------- hero stats + showcase */
+const R = D.results, docs = [["uc1", "Plain text", "GPO annual report"], ["uc2", "Long report", "World Bank, 200 pages"], ["uc3", "Visual", "Apple iMac brochure"]];
+const passCount = (r, side) => Object.values(r.answers).filter(v => v[side]).length;
+$("#stats").innerHTML = docs.map(([k, name, sub]) => { const r = R[k], n = Object.keys(r.answers).length;
+  return `<div class="stat"><div class="label">${name} · ${sub}</div><div class="big">${passCount(r, "naive")}<span class="arrow">→</span>${passCount(r, "advanced")}<small> of ${n}</small></div><div class="muted">questions answered correctly, naive → advanced</div></div>`; }).join("");
+
+const docName = {gpo: "Plain text", gep: "Long report", imac: "Visual"};
+$("#showq").innerHTML = D.showcase.map((s, i) => `<option value="${i}">${docName[s.doc]}: ${esc(s.q)}</option>`).join("");
+function renderShow(i) {
+  const s = D.showcase[i];
+  $("#showcase").innerHTML = ["naive", "advanced"].map(mode => { const r = s[mode];
+    return `<div class="lane"><div class="lane-title"><h3>${mode === "naive" ? "Naive RAG" : "Advanced RAG"}</h3><span class="muted">passages from pages ${r.pages.join(", ")}</span></div>
+      <div class="answer quote ${mode === "naive" ? "" : "good-l"}">${esc(r.answer)}</div>
+      <ol class="trace">${r.trace.map(([st, msg]) => `<li><span class="stage" style="background:${STAGE[st] || "var(--muted)"}">${st}</span><span>${esc(msg)}</span></li>`).join("")}</ol></div>`; }).join("");
+}
+$("#showq").onchange = e => renderShow(+e.target.value); renderShow(0);
+
+/* ---------- map */
+const MAP = [
+  ["Ingest", "offline", "var(--s-ingest)", [["Reading order for columns", ["GPO"], "t-reading"], ["Ligature and hyphen repair", ["WB"], "t-repair"], ["Headings from fonts", ["WB"], "t-fonts"], ["Table rebuild", ["iMac"], "t-tables"], ["Footnote links", ["iMac"], "t-notes"], ["Vision descriptions", ["iMac"], "t-vision"]]],
+  ["Chunk", "offline", "var(--s-chunk)", [["Whole sentences + overlap", ["GPO"], "t-chunk"], ["Heading path embedded", ["WB"], "t-heading"], ["Parents and children", ["WB"], "t-parents"], ["One chunk per element", ["iMac"], "t-vision"]]],
+  ["Query", "per question", "var(--s-query)", [["Rule-based routing", ["WB"], "t-query"], ["LLM query understanding", ["WB"], "t-query", true]]],
+  ["Retrieve", "per question", "var(--s-retrieve)", [["Hybrid: dense + BM25", ["GPO", "WB", "iMac"], "t-hybrid"], ["Reciprocal rank fusion", ["GPO", "WB", "iMac"], "t-hybrid"], ["Metadata filter", ["WB"], "t-query"]]],
+  ["Post-process", "per question", "var(--s-post)", [["Cross-encoder rerank", ["GPO", "WB"], "t-hybrid"], ["Small-to-big (parents)", ["WB"], "t-parents"]]],
+  ["Generate", "per question", "var(--s-gen)", [["Grounded prompt, citations, refusal", ["GPO", "WB", "iMac"], "t-ground"]]],
+];
+$("#mapgrid").innerHTML = MAP.map(([name, when, col, items], i) => `<div class="col"><h3 style="color:${col}"><span class="n">${i + 1}</span><span style="color:var(--ink)">${name}</span></h3><div class="label">${when}</div>
+  ${items.map(([t, ds, id, isNew]) => `<a class="chip" href="#${id}" data-docs="${ds.join(" ")}"><span>${t} ${isNew ? '<span class="tag new">new</span>' : ""}</span><span class="docs">${ds.map(d => `<i>${d === "WB" ? "World Bank" : d}</i>`).join("")}</span></a>`).join("")}</div>`).join("");
+$("#mapfilter").onclick = e => { const b = e.target.closest("button"); if (!b) return; pressed($("#mapfilter"), b);
+  $$(".chip").forEach(c => c.classList.toggle("dim", b.dataset.doc !== "all" && !c.dataset.docs.split(" ").includes(b.dataset.doc))); };
+
+/* ---------- system design */
+const FLOWS = {
+  naive: {off: [["PDF", "", "the document"], ["Extract text", "page.get_text()", "columns interleave"], ["Cut every 1,000 chars", "chunking.naive_chunks", "no care for sentences"], ["Embed", "infra/embeddings.py", "dense vector only"], ["Qdrant", "infra/vectordb.py", "one collection"]],
+          on: [["Question", "", ""], ["Understand", "", "skipped", 1], ["Dense search", "retrieve.dense_search", "top 5 by meaning"], ["Rerank", "", "skipped", 1], ["Parents", "", "skipped", 1], ["Prompt + LLM", "generate.ask", "numbered passages"], ["Answer", "", "with citations"]],
+          note: "The baseline used for every comparison on this page."},
+  gpo: {off: [["PDF", "", "82 pages, two columns"], ["Reading order", "ingest/layout.py", "bands, left then right; drop running headers"], ["Sentence chunks", "chunking.sentence_chunks", "~450 tokens, 60 overlap"], ["Embed twice", "infra/embeddings.py", "dense + BM25 vectors"], ["Qdrant", "uc1_sentences", "102 chunks"]],
+        on: [["Question", "", ""], ["Understand", "", "not needed: no structure to filter on", 1], ["Hybrid search", "retrieve.hybrid_search", "dense + BM25, RRF, shortlist 20"], ["Rerank", "postprocess.rerank", "cross-encoder keeps 5"], ["Parents", "", "not needed", 1], ["Prompt + LLM", "generate.ask", "cite or refuse"], ["Answer", "", "with citations"]],
+        note: "Four classic techniques. Each later pipeline reuses them."},
+  gep: {off: [["PDF", "", "200 pages, 4 chapters, 6 regions"], ["Repair + outline", "ingest/structure.py", "ligatures, fonts → chapter > section > region"], ["Parents + children", "chunking.build_hierarchy", "children carry chapter, region, heading path"], ["Embed twice", "infra/embeddings.py", "heading path + text; dense + BM25"], ["Qdrant", "uc2_children_headings", "531 children, metadata payload"]],
+        on: [["Question", "", ""], ["Understand", "query.plan", "LLM → region / chapter filter + rewrite"], ["Hybrid search", "retrieve.hybrid_search", "inside the filter"], ["Rerank", "postprocess.rerank", "keeps 5 children"], ["Parents", "postprocess.to_parents", "swap for ~900-token sections"], ["Prompt + LLM", "generate.ask", "heading path shown per passage"], ["Answer", "", "with citations"]],
+        note: "Every stage is used. The LLM appears twice: once to read the question, once to answer it."},
+  imac: {off: [["PDF", "", "12 designed pages"], ["Tables, notes, vision", "ingest/elements.py + visuals.py", "header bars, superscripts, Gemini"], ["Element chunks", "chunking.element_chunks", "one per table; endnotes attached"], ["Embed twice", "infra/embeddings.py", "dense + BM25 vectors"], ["Qdrant", "uc3_elements_vision", "37 chunks"]],
+         on: [["Question", "", ""], ["Understand", "", "not needed", 1], ["Hybrid search", "retrieve.hybrid_search", "top 5"], ["Rerank", "", "skipped: hurt table chunks", 1], ["Parents", "", "not needed: elements are whole", 1], ["Prompt + LLM", "generate.ask", "cite or refuse"], ["Answer", "", "with citations"]],
+         note: "Almost all the work is in ingestion. Retrieval stays simple."},
+};
+const OFFCOL = ["var(--muted)", "var(--s-ingest)", "var(--s-chunk)", "var(--accent)", "var(--accent)"], ONCOL = ["var(--muted)", "var(--s-query)", "var(--s-retrieve)", "var(--s-post)", "var(--s-post)", "var(--s-gen)", "var(--muted)"];
+function flowHTML(nodes, cols) { return nodes.map(([t, f, d, off], i) => `${i ? '<div class="arr" aria-hidden="true">→</div>' : ""}<div class="node ${off ? "off" : "hot"}" style="color:${cols[i]}"><b style="color:var(--ink)">${t}</b>${f ? `<span class="f">${f}</span>` : ""}${d ? `<span class="d">${d}</span>` : ""}</div>`).join(""); }
+function renderFlow(p) { $("#flow-off").innerHTML = flowHTML(FLOWS[p].off, OFFCOL); $("#flow-on").innerHTML = flowHTML(FLOWS[p].on, ONCOL); $("#dfdnote").textContent = FLOWS[p].note; }
+$("#dfdpick").onclick = e => { const b = e.target.closest("button"); if (!b) return; pressed($("#dfdpick"), b); renderFlow(b.dataset.p); };
+renderFlow("gep");
+
+/* ---------- reading order */
+$("#read-common").textContent = D.reading.common + " …";
+$("#brk-gpo").textContent = D.reading.common.slice(0, 260) + " …";
+$("#brk-gpo-hit").textContent = Math.round(R.uc1.naive["hit@1"] * 100) + "%";
+$("#brk-gpo-cut").textContent = (100 - D.chunk_stats.naive.end_sentence) + "%"; $("#read-ours").textContent = D.reading.ours + " …";
+
+/* ---------- chunk toy */
+function sentences(text) { const out = []; let start = 0; const re = /(?<=[.!?])\s+(?=[A-Z0-9"“(\[])/g; let m;
+  while ((m = re.exec(text))) { const w = text.slice(start, m.index).split(" ").pop().replace(/\.$/, "").toLowerCase();
+    if (["mr", "mrs", "ms", "dr", "st", "no", "vs", "inc", "co", "u.s", "fy", "e.g", "i.e", "etc"].includes(w)) continue; out.push(text.slice(start, m.index)); start = m.index + m[0].length; }
+  out.push(text.slice(start)); return out.filter(Boolean); }
+let chunkMode = "naive";
+function renderChunks() {
+  const size = +$("#chunksize").value, text = D.chunk_text; $("#chunksizev").textContent = size;
+  let html = "", ends = 0, n = 0;
+  if (chunkMode === "naive") {
+    for (let i = 0; i < text.length; i += size) { const c = text.slice(i, i + size); n++; const whole = /[.!?"”)]$/.test(c.trim()); ends += whole;
+      html += `<span class="ck">${esc(c)}${whole ? "" : '<span class="cut" title="cut mid-sentence"> ✂</span>'}</span>`; }
+  } else {
+    const ss = sentences(text), overlap = Math.round(size * .14); let cur = [], len = 0;
+    const close = () => { n++; ends += /[.!?"”)]$/.test(cur[cur.length - 1].trim()); html += `<span class="ck">${cur.map((s, j) => j < cur.carried ? `<span class="ov" title="overlap from the previous chunk">${esc(s)}</span>` : esc(s)).join(" ")}</span>`;
+      const keep = []; let kept = 0; for (const s of [...cur].reverse()) { if (kept + s.length > overlap) break; keep.unshift(s); kept += s.length; }
+      cur = keep; cur.carried = keep.length; len = kept; };
+    cur.carried = 0;
+    for (const s of ss) { if (len + s.length > size && len > overlap) close(); cur.push(s); len += s.length; }
+    if (cur.length > cur.carried) close();
+  }
+  $("#chunkview").innerHTML = html;
+  $("#chunkstat").innerHTML = `${n} chunks on this page excerpt; ${Math.round(100 * ends / n)}% end at a sentence boundary. ${chunkMode === "sent" ? "Wavy underline: overlap repeated from the previous chunk." : "✂ marks a cut in the middle of a sentence."} Whole report: ${D.chunk_stats.naive.end_sentence}% of naive chunks end a sentence, against ${D.chunk_stats.sentence.end_sentence}%.`;
+}
+$("#chunkmode").onclick = e => { const b = e.target.closest("button"); if (!b) return; pressed($("#chunkmode"), b); chunkMode = b.dataset.m; renderChunks(); };
+$("#chunksize").oninput = renderChunks; renderChunks();
+
+/* ---------- RRF */
+const rrf = D.rrf; $("#rrfq").innerHTML = `Question: <i>${esc(rrf.question)}</i>`;
+const byId = {}; [...rrf.dense, ...rrf.bm25, ...rrf.rerank].forEach(x => byId[x.id] = x);
+const li = (x, score) => `<li class="${x.fact ? "fact" : ""}" data-id="${x.id}"><span class="t" title="${esc(x.text)}">p.${x.page} · ${esc(x.text)}</span><span class="sc">${score ?? ""}</span></li>`;
+$("#l-dense").innerHTML = rrf.dense.map(x => li(x)).join(""); $("#l-bm25").innerHTML = rrf.bm25.map(x => li(x)).join("");
+$("#l-rerank").innerHTML = rrf.rerank.map(x => li(x, x.score.toFixed(2))).join("");
+function renderRRF(k) {
+  $("#rrfformula").textContent = k === 2 ? "1 / (rank + 1)" : "1 / (rank + 60)";
+  const sc = {}; for (const list of [rrf.dense, rrf.bm25]) list.forEach((x, i) => sc[x.id] = (sc[x.id] || 0) + 1 / (k === 2 ? i + 2 : i + 61));   // rank = i + 1
+  const fused = Object.entries(sc).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  $("#l-fused").innerHTML = fused.map(([id, s]) => li(byId[id], s.toFixed(3))).join("");
+}
+$("#rrfk").onclick = e => { const b = e.target.closest("button"); if (!b) return; pressed($("#rrfk"), b); renderRRF(+b.dataset.k); };
+renderRRF(2);
+$("#t-hybrid").addEventListener("mouseover", e => { const l = e.target.closest("li[data-id]"); $$("#t-hybrid li").forEach(x => x.classList.toggle("hover", !!l && x.dataset.id === l.dataset.id)); });
+$("#t-hybrid").addEventListener("mouseleave", () => $$("#t-hybrid li").forEach(x => x.classList.remove("hover")));
+$("#sysprompt").textContent = D.prompts.system;
+
+/* ---------- GEP */
+const markDiff = (s, words) => words.reduce((t, w) => t.split(w).join(`<mark>${w}</mark>`), esc(s));
+$("#lig-raw").innerHTML = markDiff(D.ligature.raw, ["Te ", "ﬂ"]) + " …"; $("#lig-fixed").innerHTML = markDiff(D.ligature.fixed, ["The ", "fl"]) + " …";
+const H = D.hierarchy;
+$("#hier-stats").innerHTML = [[H.sections, "sections found from fonts"], [H.parents, "parent sections"], [H.children, "searchable children"], [H.naive, "naive chunks, for comparison"]]
+  .map(([v, l]) => `<div class="stat"><div class="big">${v}</div><div class="muted">${l}</div></div>`).join("");
+$("#hier-line").textContent = `In this report: ${H.children} children inside ${H.parents} parents.`;
+$("#sar-text").innerHTML = esc(D.sar.text).replace("SAR", "<mark>SAR</mark>") + " …"; $("#sar-q").textContent = `"${D.sar.question}"`; $("#sar-h").textContent = `"${D.sar.heading}"`;
+const lo = .6, hi = .85, pct = v => `${Math.max(0, (v - lo) / (hi - lo)) * 100}%`;
+$("#sim1").style.width = pct(D.sar.sim_plain); $("#sim2").style.width = pct(D.sar.sim_heading); $("#sim1").parentElement.parentElement.classList.add("base");
+$("#sim1").style.background = "var(--muted)"; $("#sim1v").textContent = D.sar.sim_plain.toFixed(2); $("#sim2v").textContent = D.sar.sim_heading.toFixed(2);
+const tagText = t => Object.keys(t).length ? Object.entries(t).map(([k, v]) => `${k.replace("_", " ")}${v === true ? "" : ": " + v}`).join(", ") : "";
+$("#routing").innerHTML = D.routing.map(r => `<tr><td>${esc(r.q)}</td><td class="${tagText(r.rules) ? "" : "none"}">${esc(tagText(r.rules) || "no filter")}</td>
+  <td><b>${esc(tagText(r.llm) || "no filter")}</b><br><span class="muted" style="font-size:.82rem">search: ${esc(r.rewrite)}</span></td></tr>`).join("");
+
+/* ---------- iMac */
+$("#imac-raw").textContent = D.imac_raw.join("\n"); $("#imac-tab").textContent = D.imac_tables.join("\n\n");
+$("#fn-raw").innerHTML = "… " + esc(D.footnote.raw).replace(/STAR\.18$/, "STAR.<mark>18</mark>");
+$("#fn-claim").textContent = D.footnote.claim; $("#fn-note").textContent = D.footnote.note + " …";
+$("#vision").textContent = D.vision.replace(/\*\*/g, "") + " …";
+const EC = D.imac_counts; $("#el-stats").innerHTML = [[EC.table, "table chunks"], [EC.text, "prose chunks"], [EC.vision, "vision descriptions"]]
+  .map(([v, l]) => `<div class="stat"><div class="big">${v}</div><div class="muted">${l}</div></div>`).join("");
+
+/* ---------- ladders */
+function ladder(el, rows) {
+  el.innerHTML = rows.map(([name, v, cls]) => `<div class="lrow ${cls || ""}"><span class="name">${esc(name)}</span><div class="track" role="img" aria-label="${esc(name)}: ${v.toFixed(2)}"><div class="fill" style="width:${v * 100}%"></div></div><span class="v">${v.toFixed(2)}</span></div>`).join("")
+    + `<div class="axis"><span></span><div class="ticks"><span>0</span><span>0.25</span><span>0.5</span><span>0.75</span><span>1</span></div><span></span></div>`;
+}
+const L = k => R[k].ladder;
+ladder($("#lad-gpo"), [["Naive: 1,000-char chunks, dense", L("uc1")["A naive chunks, dense"].MRR, "base"], ["Sentence chunks", L("uc1")["B sentence chunks, dense"].MRR],
+  ["+ hybrid", L("uc1")["C + hybrid"].MRR], ["+ rerank", L("uc1")["D + rerank top 20"].MRR]]);
+const g = L("uc2");
+ladder($("#lad-gep"), [["Naive: 1,000-char chunks", g["1 naive 1000-char chunks"].MRR, "base"], ["Section-aware chunks", g["2 section-aware chunks"].MRR], ["+ heading path", g["3 + heading path embedded"].MRR],
+  ["+ hybrid", g["4 + hybrid"].MRR], ["+ LLM routing filter", g["5 + routing (LLM)"].MRR], ["+ rerank", g["6 + rerank (LLM)"].MRR], ["+ parents (bigger target)", g["7 + parents (what the LLM sees)"].MRR, "note"]]);
+const im = L("uc3");
+ladder($("#lad-imac"), [["Naive: 1,000-char chunks", im["1 naive 1000-char chunks, dense"].MRR, "base"], ["Plain-text recipe from chapter 1", im["2 plain-text recipe (sentences, hybrid, rerank)"].MRR],
+  ["Element chunks, dense", im["3 element chunks, dense"].MRR], ["Element chunks, hybrid", im["4 element chunks, hybrid"].MRR], ["… + rerank", im["5 element chunks, hybrid, rerank"].MRR, "worse"],
+  ["Elements + vision, hybrid", im["6 elements + vision, hybrid"].MRR]]);
+
+/* ---------- scorecard */
+ladder($("#scorebars"), docs.flatMap(([k, name]) => [[`${name}: naive`, R[k].naive.MRR, "base"], [`${name}: advanced`, R[k].advanced.MRR]]));
+$("#scoretable").innerHTML = docs.map(([k, name, sub]) => { const r = R[k], n = Object.keys(r.answers).length;
+  return `<tr><td>${name} <span class="muted">· ${sub}</span></td><td class="mono">${r.naive.MRR.toFixed(2)}</td><td class="mono"><b>${r.advanced.MRR.toFixed(2)}</b></td><td class="mono">${passCount(r, "naive")}/${n}</td><td class="mono"><b>${passCount(r, "advanced")}/${n}</b></td></tr>`; }).join("");
+
+/* ---------- code tour */
+/* ---------- rail: active section + arrow keys */
+const secs = $$("main section"), links = $$("#rail a");
+const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) links.forEach(a => a.classList.toggle("on", a.getAttribute("href") === "#" + e.target.id)); }), {rootMargin: "-45% 0px -50% 0px"});
+secs.forEach(s => io.observe(s));
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+  const y = window.scrollY + 80, idx = secs.findIndex((s, i) => !secs[i + 1] || secs[i + 1].offsetTop > y);
+  const t = secs[Math.min(secs.length - 1, Math.max(0, idx + (e.key === "ArrowRight" ? 1 : -1)))];
+  e.preventDefault(); t.scrollIntoView();
+});
+</script>
+
+</body></html>

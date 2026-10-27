@@ -4,17 +4,17 @@
 # python
 __pycache__/
 *.pyc
-backend/venv/
-backend/.venv/
+venv/
+.venv/
 
 # node
-frontend/node_modules/
-frontend/dist/
+node_modules/
+dist/
 
 # misc
 .DS_Store
 
-# generated
+# generated (per task)
 chroma_db/
 results/
 
