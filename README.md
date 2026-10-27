@@ -29,5 +29,5 @@ Then follow the README inside the task folder.
 | Task | Sample questions | Retrieval hit@k | Judge score |
 |---|---|---|---|
 | 1 | | | |
-| 2 | | | |
-| 3 | | | |
+| 2 | 3 | 3/3 pages, 3/3 sections | 3/3 correct |
+| 3 | 7 (3 from the brief + 4 added) | 7/7 pages, 7/7 evidence type | 7/7 correct |

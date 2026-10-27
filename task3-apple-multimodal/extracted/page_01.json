@@ -1,0 +1,108 @@
+{
+  "page": 1,
+  "title": "Product Environmental Report",
+  "endnotes_page": false,
+  "text": [
+    "Smarter chemistry[^5]",
+    "• Arsenic-free glass • Mercury-free • Brominated flame retardant–free • PVC-free",
+    "Product Environmental Report",
+    "iMac",
+    "Date introduced October 28, 2024",
+    "This report includes data current as of product launch. Product evaluations are based on U.S. configuration of iMac.",
+    "Product carbon footprint calculations include in-box accessories as well as packaging.",
+    "Longevity",
+    "We assessed iMac in our Reliability Testing",
+    "Lab using rigorous testing methods that",
+    "simulate customers’ experiences.",
+    "Recovery",
+    "Return your device through Apple Trade In—at",
+    "a retail store or online—and we’ll give",
+    "it a new life or recycle it for free.",
+    "Progress toward",
+    "our 2030 goal",
+    "More than 15% recycled content[^1]",
+    "Over 20% of manufacturing electricity sourced from renewable energy[^2]",
+    "Packaging",
+    "100% fiber-based, due to our work to remove plastic in packaging[^3]",
+    "100% recycled or responsibly sourced wood fibers[^4]",
+    "Supplier Code of Conduct",
+    "Through the Apple Supplier Code of Conduct, we set strict standards",
+    "for safeguarding people and the environment in our supply chain.",
+    "iMac uses 100% recycled aluminum in the stand"
+  ],
+  "vision": [
+    {
+      "kind": "callout",
+      "title": "Progress toward our 2030 goal",
+      "content": "More than 15% recycled content. Over 20% of manufacturing electricity sourced from renewable energy.",
+      "footnotes": [
+        1,
+        2
+      ],
+      "in_footnote": null
+    },
+    {
+      "kind": "callout",
+      "title": "Packaging",
+      "content": "100% fiber-based, due to our work to remove plastic in packaging. 100% recycled or responsibly sourced wood fibers.",
+      "footnotes": [
+        3,
+        4
+      ],
+      "in_footnote": null
+    },
+    {
+      "kind": "callout",
+      "title": "Supplier Code of Conduct",
+      "content": "Through the Apple Supplier Code of Conduct, we set strict standards for safeguarding people and the environment in our supply chain.",
+      "footnotes": [],
+      "in_footnote": null
+    },
+    {
+      "kind": "callout",
+      "title": "Smarter chemistry",
+      "content": "Arsenic-free glass. Mercury-free. Brominated flame retardant-free. PVC-free.",
+      "footnotes": [
+        5
+      ],
+      "in_footnote": null
+    },
+    {
+      "kind": "callout",
+      "title": "Longevity",
+      "content": "We assessed iMac in our Reliability Testing Lab using rigorous testing methods that simulate customers' experiences.",
+      "footnotes": [],
+      "in_footnote": null
+    },
+    {
+      "kind": "callout",
+      "title": "Recovery",
+      "content": "Return your device through Apple Trade In-at a retail store or online-and we'll give it a new life or recycle it for free.",
+      "footnotes": [],
+      "in_footnote": null
+    },
+    {
+      "kind": "callout",
+      "title": "Aluminum stand",
+      "content": "iMac uses 100% recycled aluminum in the stand",
+      "footnotes": [],
+      "in_footnote": null
+    },
+    {
+      "kind": "logo",
+      "title": "Energy Star Certification",
+      "content": "ENERGY STAR certification mark.",
+      "footnotes": [],
+      "in_footnote": null
+    },
+    {
+      "kind": "logo",
+      "title": "EPEAT Gold Registration",
+      "content": "EPEAT Gold registration mark.",
+      "footnotes": [
+        6
+      ],
+      "in_footnote": null
+    }
+  ]
+}

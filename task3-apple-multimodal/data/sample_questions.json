@@ -2,16 +2,47 @@
   {
     "question": "How much less energy does iMac use compared to the ENERGY STAR requirement?",
     "expected_answer": "iMac uses 58 percent less energy than the requirement for ENERGY STAR.",
-    "expected_pages": [7]
+    "expected_pages": [7],
+    "expected_kind": "text"
   },
   {
     "question": "What is the total carbon footprint of the iMac, and how much of that comes from product use versus manufacturing?",
     "expected_answer": "For iMac (two ports) 256GB the total product footprint is 346 kg CO2e: production 50 percent, product use 45 percent, transportation 5 percent, and end-of-life processing under 1 percent. The iMac (four ports) 512GB configuration is 391 kg CO2e.",
-    "expected_pages": [10, 2]
+    "expected_pages": [10],
+    "expected_kind": "table"
   },
   {
     "question": "What material is the iMac stand made from, and what percentage of it is recycled?",
     "expected_answer": "The stand is made from aluminum, and it is 100 percent recycled aluminum.",
-    "expected_pages": [4, 1, 2]
+    "expected_pages": [1, 4],
+    "expected_kind": "callout"
+  },
+  {
+    "question": "How much power does the iMac draw in sleep mode at 115V?",
+    "expected_answer": "0.57W in sleep mode at 115V (0.56W at 100V and 0.59W at 230V).",
+    "expected_pages": [12],
+    "expected_kind": "table",
+    "added": true
+  },
+  {
+    "question": "What were the iMac's baseline emissions before reductions, and how much were emissions reduced?",
+    "expected_answer": "Baseline emissions were 445 kg; emissions reductions of 99 kg (from recycled and low-carbon materials, low-carbon electricity, and non-air shipping) bring iMac emissions to 346 kg.",
+    "expected_pages": [2],
+    "expected_kind": "chart",
+    "added": true
+  },
+  {
+    "question": "What EPEAT rating did the iMac achieve, and where?",
+    "expected_answer": "iMac achieved an EPEAT Gold rating in the United States and Canada, in accordance with IEEE 1680.1 or UL 110.",
+    "expected_pages": [11],
+    "expected_kind": "footnote",
+    "added": true
+  },
+  {
+    "question": "What percentage of recycled content is in the iMac's fiber packaging?",
+    "expected_answer": "The iMac's packaging contains 76 percent recycled content (fiber packaging), and the packaging is 100 percent fiber-based.",
+    "expected_pages": [6],
+    "expected_kind": "callout",
+    "added": true
   }
 ]
